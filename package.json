@@ -1,0 +1,96 @@
+{
+  "name": "projetista",
+  "version": "1.0.0",
+  "description": "CAD paramétrico com kernel B-rep exato (OpenCascade), GPU, processamento paralelo e servidor MCP para o Claude",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "node src/cli.js app",
+    "desktop": "electron .",
+    "mcp": "node src/cli.js mcp",
+    "test": "node tests/smoke.mjs && node tests/kernel.mjs && node tests/ui-api.mjs",
+    "icon": "node scripts/make-icon.mjs",
+    "dist": "electron-builder --win nsis",
+    "docs": "node scripts/gen-docs.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emersonsg01/Projetista.git"
+  },
+  "keywords": [],
+  "author": {
+    "name": "Emerson Gonçalves"
+  },
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/emersonsg01/Projetista/issues"
+  },
+  "homepage": "https://github.com/emersonsg01/Projetista#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "replicad-opencascadejs": "^1.1.0",
+    "three": "^0.187.0",
+    "ws": "^8.22.1",
+    "zod": "^4.6.7"
+  },
+  "bin": {
+    "projetista": "src/cli.js"
+  },
+  "devDependencies": {
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0"
+  },
+  "productName": "Projetista",
+  "build": {
+    "appId": "br.projetista.cad",
+    "productName": "Projetista",
+    "copyright": "Projetista",
+    "asar": false,
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**",
+      "src/**",
+      "web/**",
+      "build/icon.png",
+      "package.json",
+      "!**/*.map",
+      "!node_modules/replicad-opencascadejs/dist/*.d.ts"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "executableName": "Projetista"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Projetista",
+      "artifactName": "Projetista-Setup-${version}.exe",
+      "installerLanguages": [
+        "pt_BR"
+      ],
+      "language": "1046"
+    },
+    "fileAssociations": [
+      {
+        "ext": "projetista",
+        "name": "Projeto Projetista",
+        "description": "Projeto Projetista CAD",
+        "icon": "build/icon.png"
+      }
+    ]
+  }
+}

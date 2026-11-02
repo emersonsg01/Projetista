@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projetista</title>
+<link rel="stylesheet" href="/web/css/app.css">
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/web/vendor/addons/" } }
+</script>
+</head>
+<body>
+<header id="titlebar">
+  <button id="appBtn" class="app-btn" title="Arquivo"></button>
+  <div id="qat"></div>
+  <div id="docTitle">Projetista</div>
+  <div class="search">
+    <input id="cmdSearch" placeholder="Pesquisar comandos (Ctrl+F)" autocomplete="off" spellcheck="false">
+    <div id="searchResults" class="hidden"></div>
+  </div>
+  <div id="winctl"></div>
+</header>
+<nav id="ribbonTabs"></nav>
+<section id="ribbon"></section>
+
+<div id="work">
+  <aside id="browserPane">
+    <div class="pane-head"><span>Modelo</span></div>
+    <div id="tree"></div>
+  </aside>
+  <div id="splitter" title="Arraste para redimensionar"></div>
+  <main id="viewport">
+    <div id="labels"></div>
+    <canvas id="navcube"></canvas>
+    <button id="navHome" title="Vista inicial (F6)"></button>
+    <div id="navbar"></div>
+    <div id="toasts"></div>
+    <div id="home" class="hidden"></div>
+  </main>
+</div>
+
+<footer id="footer">
+  <div id="doctabs">
+    <button id="tabHome">⌂ Início</button>
+    <button id="tabDoc" class="on"><span class="nm">Peça1</span></button>
+  </div>
+  <div id="statusbar"><span id="prompt">Pronto</span><span id="statusRight"></span></div>
+</footer>
+
+<div id="backstage" class="hidden"></div>
+<script type="module" src="/web/js/main.js"></script>
+</body>
+</html>

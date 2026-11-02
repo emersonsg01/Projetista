@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "projetista", "runtimeExecutable": "node", "runtimeArgs": ["src/cli.js", "app"], "port": 7777 }
+  ]
+}

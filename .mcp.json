@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "projetista": {
+      "command": "node",
+      "args": ["src/cli.js", "mcp"]
+    }
+  }
+}

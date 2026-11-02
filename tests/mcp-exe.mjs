@@ -1,0 +1,24 @@
+// Testa o servidor MCP usando o executável instalado (ELECTRON_RUN_AS_NODE), como o Claude fará.
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import fs from 'node:fs';
+import path from 'node:path';
+const exe = path.resolve(process.argv[2] || 'dist/win-unpacked/Projetista.exe');
+const cli = path.join(path.dirname(exe), 'resources', 'app', 'src', 'cli.js');
+const transport = new StdioClientTransport({ command: exe, args: [cli, 'mcp'], env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PROJETISTA_HOME: path.resolve('tests/out/pkg-home') }, stderr: 'inherit' });
+const client = new Client({ name: 'teste-exe', version: '1' });
+await client.connect(transport);
+const tools = (await client.listTools()).tools;
+console.log(tools.length, 'ferramentas');
+const call = async (name, args) => { const r = await client.callTool({ name, arguments: args }); return r; };
+await call('document', { action: 'new', name: 'Teste exe' });
+let r = await call('add_features', { features: [{ type: 'box', width: 40, depth: 30, height: 20, body: 'B' }, { type: 'fillet', body: 'B', edges: 'all', radius: 2 }] });
+console.log(r.content[0].text.slice(0, 160).replace(/\s+/g, ' '));
+r = await call('render_view', { view: 'iso' });
+const img = r.content.find((c) => c.type === 'image');
+fs.writeFileSync('tests/out/exe-render.png', Buffer.from(img.data, 'base64'));
+console.log(r.content.find((c) => c.type === 'text').text.slice(0, 140));
+r = await call('export_model', { format: 'step' });
+console.log(r.content[0].text.replace(/\s+/g, ' ').slice(0, 200));
+await client.close();
+process.exit(0);
