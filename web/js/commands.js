@@ -15,7 +15,7 @@ const OPS = [
 ];
 const nextBodyName = () => { let i = 1; const names = new Set(bodyNames()); while (names.has(`Corpo${i}`)) i++; return `Corpo${i}`; };
 const outputFields = (opts = OPS) => [
-  { key: 'operation', label: 'Booleana', type: 'segmented', options: opts, rerender: true },
+  { key: 'operation', label: 'Resultado', type: 'segmented', labels: true, options: opts, rerender: true },
   { key: 'target', label: 'Corpo alvo', type: 'select', options: () => bodyNames(), show: (s) => s.operation !== 'new' },
   { key: 'body', label: 'Nome do corpo', type: 'text', show: (s) => s.operation === 'new' },
   { key: 'material', label: 'Material', type: 'select', options: () => ['(padrão)', ...(app.materials || [])], show: (s) => s.operation === 'new' },
@@ -87,7 +87,7 @@ P.extrude = {
   sections: [
     { title: 'Entrada geométrica', fields: [{ key: 'sketch', label: 'Perfil (esboço)', type: 'select', options: () => sketchNames() }] },
     { title: 'Comportamento', fields: [
-      { key: 'direction', label: 'Direção', type: 'segmented', options: [{ value: 'normal', label: 'Padrão', icon: 'dirNormal' }, { value: 'reverse', label: 'Invertida', icon: 'dirReverse' }, { value: 'symmetric', label: 'Simétrica', icon: 'dirSym' }, { value: 'two-sides', label: 'Dois lados', icon: 'dirTwo' }], rerender: true },
+      { key: 'direction', label: 'Direção', type: 'segmented', labels: true, options: [{ value: 'normal', label: 'Padrão', icon: 'dirNormal' }, { value: 'reverse', label: 'Invertida', icon: 'dirReverse' }, { value: 'symmetric', label: 'Simétrica', icon: 'dirSym' }, { value: 'two-sides', label: 'Dois lados', icon: 'dirTwo' }], rerender: true },
       { key: 'extent', label: 'Extensão', type: 'segmented', labels: true, options: [{ value: 'distance', label: 'Distância' }, { value: 'through', label: 'Através de tudo' }], rerender: true },
       { key: 'distance', label: 'Distância A', type: 'expr', unit: 'mm', show: (s) => s.extent !== 'through' },
       { key: 'distance2', label: 'Distância B', type: 'expr', unit: 'mm', show: (s) => s.direction === 'two-sides' },
@@ -439,11 +439,12 @@ simple('undo', 'Desfazer', 'undo', () => rpc('undo').catch((e) => toast(e.messag
 simple('redo', 'Refazer', 'redo', () => rpc('redo').catch((e) => toast(e.message, 'warn')), { key: 'Ctrl+Y' });
 simple('rebuild', 'Reconstruir tudo', 'rebuild', () => D.rebuildAll());
 simple('importMesh', 'Importar STL/OBJ', 'import', () => D.importMesh());
+simple('exportDialog', 'Exportar…', 'export', () => D.exportDialog(), { key: 'Ctrl+E' });
 simple('exportStep', 'STEP', 'stepFile', () => D.exportAs('step'));
 simple('exportStl', 'STL', 'stlFile', () => D.exportAs('stl'));
 simple('export3mf', '3MF', 'mfFile', () => D.exportAs('3mf'));
 simple('exportGlb', 'GLB', 'glbFile', () => D.exportAs('glb'));
-simple('exportObj', 'OBJ', 'export', () => D.exportAs('obj'));
+simple('exportObj', 'OBJ', 'objFile', () => D.exportAs('obj'));
 simple('drawing', 'Desenho técnico', 'drawing', () => D.drawingDialog());
 simple('iprops', 'Propriedades físicas', 'iprops', () => D.ipropsDialog());
 simple('interference', 'Interferência', 'interference', () => D.interferenceDialog());

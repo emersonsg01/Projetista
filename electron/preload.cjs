@@ -9,5 +9,7 @@ contextBridge.exposeInMainWorld('projetista', {
   onMenu: (fn) => ipcRenderer.on('menu', (_e, m) => fn(m)),
   pickFile: (opts) => ipcRenderer.invoke('pick-file', opts),
   saveFile: (opts) => ipcRenderer.invoke('save-file', opts),
+  pickFolder: (opts) => ipcRenderer.invoke('pick-folder', opts),
+  homeDir: () => ipcRenderer.invoke('home-dir'),
   setTitleBar: (theme) => ipcRenderer.invoke('title-bar', theme),
 });

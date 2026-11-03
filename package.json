@@ -1,6 +1,6 @@
 {
   "name": "projetista",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "CAD paramétrico com kernel B-rep exato (OpenCascade), GPU, processamento paralelo e servidor MCP para o Claude",
   "main": "electron/main.cjs",
   "scripts": {

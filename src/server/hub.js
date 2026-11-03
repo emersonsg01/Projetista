@@ -26,7 +26,8 @@ function sceneMessage(studio) {
   return { type: 'scene', version: studio.doc.version || 0, bodies, sketches: studio.sketchPolylines() };
 }
 
-export function startHub(studio, { port = Number(process.env.PROJETISTA_PORT) || 7777, quiet = false } = {}) {
+export function startHub(studio, { port = Number(process.env.PROJETISTA_PORT) || 7777, quiet = false, owner = 'app', onHandover } = {}) {
+  let closing = false;
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     let p = decodeURIComponent(url.pathname);
@@ -45,7 +46,21 @@ export function startHub(studio, { port = Number(process.env.PROJETISTA_PORT) ||
       out.on('error', (e) => { res.writeHead(500); res.end(e.message); });
       return;
     }
-    if (p === '/api/info') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ app: 'projetista', pid: process.pid, gpuRenderer: !!studio.gpuRender })); return; }
+    if (p === '/api/info') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ app: 'projetista', owner, pid: process.pid, workspace: WORKSPACE, gpuRenderer: !!studio.gpuRender })); return; }
+    if (p === '/api/handover' && req.method === 'POST') {
+      // O app desktop assume o kernel: este backend (iniciado pelo MCP) entrega o documento,
+      // libera a porta e passa a operar como ponte para o app.
+      if (owner !== 'mcp' || closing) { res.writeHead(409, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'este kernel pertence ao app' })); return; }
+      closing = true;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ document: studio.doc.toJSON(), workspace: WORKSPACE }), () => {
+        for (const c of wss.clients) c.terminate();
+        wss.close();
+        server.close(() => onHandover?.());
+        server.closeAllConnections?.();
+      });
+      return;
+    }
     let file;
     if (p.startsWith('/vendor/three/')) file = path.join(ROOT, 'node_modules/three', p.slice('/vendor/three/'.length));
     else if (p.startsWith('/files/')) file = path.join(WORKSPACE, p.slice(7));
@@ -60,7 +75,9 @@ export function startHub(studio, { port = Number(process.env.PROJETISTA_PORT) ||
     const allowed = [path.join(ROOT, 'web'), path.join(ROOT, 'node_modules/three'), WORKSPACE];
     if (file && !allowed.some((a) => path.resolve(file).startsWith(a + path.sep))) file = null;
     if (!file || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end('não encontrado'); return; }
-    res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache' });
+    const head = { 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache' };
+    if (url.searchParams.has('download')) head['content-disposition'] = `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(file))}`;
+    res.writeHead(200, head);
     fs.createReadStream(file).pipe(res);
   });
 
@@ -95,6 +112,8 @@ export function startHub(studio, { port = Number(process.env.PROJETISTA_PORT) ||
   };
 
   wss.on('connection', async (ws) => {
+    // janela fechada/recarregada no meio de um comando: conclui a transação (mantém o trabalho)
+    ws.on('close', () => { if (ws.ownsTx && studio.doc?.tx) studio.doc.commitTransaction(); });
     send(ws, sceneMessage(studio));
     send(ws, { type: 'state', state: await studio.run('state') });
     send(ws, { type: 'activities', activities: studio.activity });
@@ -103,6 +122,9 @@ export function startHub(studio, { port = Number(process.env.PROJETISTA_PORT) ||
       try { msg = JSON.parse(raw); } catch { return; }
       if (msg.type === 'register' && msg.role === 'gpu-renderer') { ws.desktop = !!msg.desktop; registerRenderer(ws); return; }
       if (msg.type === 'render-result') { const p = renderWaits.get(msg.id); renderWaits.delete(msg.id); if (p) (msg.ok ? p.resolve(msg) : p.reject(new Error(msg.error))); return; }
+      // quem abre um comando interativo (transação) é responsável por fechá-lo
+      if (msg.cmd === 'tx_begin') ws.ownsTx = true;
+      if (msg.cmd === 'tx_commit' || msg.cmd === 'tx_cancel') ws.ownsTx = false;
       try {
         const result = await studio.run(msg.cmd, msg.args || {}, msg.source === 'claude' ? 'claude' : 'ui');
         const clean = result && result.png ? { ...result, png: undefined, image: result.png.toString('base64') } : result;

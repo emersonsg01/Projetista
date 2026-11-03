@@ -44,10 +44,10 @@ O documento é salvo automaticamente a cada alteração. Ao reabrir o app, você
 ## 2. A tela
 
 ```
-┌ Barra de título: [◆] Novo Abrir Salvar │ ↶ ↷ │ ⟳ │ Material  Cor       Nome do documento        [Pesquisar comandos] ┐
-├ Abas: [Arquivo] Modelo 3D  Anotar  Inspecionar  Ferramentas  Gerenciar  Vista  Claude ✦  (Esboço aparece ao editar)    ┤
-├ Faixa de opções: painéis com botões grandes e pequenos (Esboço · Criar · Modificar · Padrão · Primitivas…)               ┤
-├──────────────┬──────────────────────────────────────────────────────────────────────────────────────── [cubo]     ┤
+┌ Barra de título: [◆] Novo Abrir Salvar Exportar │ ↶ ↷ │ ⟳ │ Material  Cor     Nome do documento   [Pesquisar comandos] ┐
+├ Abas: [Arquivo] Modelo 3D  Inspecionar  Exportar  Gerenciar  Vista  Claude ✦   (Esboço aparece ao editar um esboço)     ┤
+├ Faixa de opções: painéis por tarefa (Esboço · Criar · Modificar · Corpos · Primitivas · Montagem · Medir)               ┤
+├──────────────┬────────────── [ ● instrução do comando atual · Esc cancela ] ─────────────────────────── [cubo]     ┤
 │ Navegador    │  Janela gráfica                                                                         [barra de ┤
 │ do modelo    │  (painel de propriedades flutua aqui durante um comando)                                navegação]┤
 │              │                                                                                                    │
@@ -61,8 +61,15 @@ O documento é salvo automaticamente a cada alteração. Ao reabrir o app, você
 - **Barra de título e acesso rápido.** Comandos frequentes. A lista **Material** muda o material do corpo
   selecionado ou, sem seleção, o padrão do documento. O campo de cor muda a aparência do corpo selecionado.
   **Pesquisar comandos** (Ctrl+F) encontra qualquer comando pelo nome.
-- **Faixa de opções.** Duplo clique numa aba recolhe ou expande a faixa. A aba **Arquivo** abre o menu de
-  arquivo em tela cheia, com documentos recentes.
+- **Faixa de opções.** As abas seguem as etapas do trabalho: **Modelo 3D** (criar e modificar),
+  **Inspecionar** (medir e verificar), **Exportar** (arquivos, desenho e importação), **Gerenciar**
+  (parâmetros, versões, estudos), **Vista** e **Claude**. Pare o mouse sobre um botão por meio segundo para
+  ver o que ele faz e o atalho. Duplo clique numa aba recolhe ou expande a faixa. A aba **Arquivo** abre o
+  menu de arquivo em tela cheia, com documentos recentes.
+- **Instrução do comando.** Enquanto um comando ou esboço está ativo, um aviso no topo da área 3D diz o que
+  fazer em seguida (por exemplo, "Selecione as arestas") e o que a tecla Esc faz.
+- **Documento vazio.** Um cartão "Comece seu modelo" oferece os pontos de partida: desenhar um esboço, criar
+  uma caixa, importar STEP ou abrir um exemplo.
 - **Navegador do modelo.** Árvore do documento: corpos sólidos, origem (planos e eixos), recursos na ordem da
   linha do tempo e o marcador **Fim da peça**.
 - **Janela gráfica.** Modelo 3D, cubo de navegação (canto superior direito), barra de navegação (abaixo do
@@ -298,18 +305,37 @@ Escolha **1º diedro (ABNT/ISO)** ou **3º diedro (ANSI)**. Use a roda do mouse 
 | **SVG** | — | ✔ (desenho técnico) | — |
 | **.projetista** | ✔ | ✔ | Documento nativo (JSON com parâmetros, linha do tempo e versões) |
 
-A precisão da malha exportada (STL/3MF) é definida em **Opções › Tesselagem**: normal 0,02 mm, fina 0,005 mm
-ou ultra 0,001 mm de erro cordal.
+### Exportar (Ctrl+E)
+
+Abra pelo botão **Exportar** da barra de acesso rápido, pela aba **Exportar** ou por **Arquivo › Exportar…**.
+O diálogo tem três passos:
+
+1. **Formato.** Cada cartão explica para que serve: STEP (outros CADs e usinagem), STL e 3MF (impressão 3D),
+   OBJ, GLB (web/AR) ou desenho SVG. Os botões pequenos da aba Exportar abrem o diálogo já no formato.
+2. **Conteúdo e precisão.** Todos os corpos ou só os escolhidos. Para malhas, a precisão: normal 0,02 mm,
+   fina 0,005 mm ou ultra 0,001 mm de erro cordal. O STEP é sempre exato. Para o SVG, diedro e folha.
+3. **Destino.** Pasta (padrão `Documentos\Projetista\Exportações`, lembrada para a próxima vez), nome do
+   arquivo e **Arquivo final**, que mostra o caminho completo antes de gravar.
+
+Detalhes que evitam erros:
+
+- A extensão sempre combina com o formato. Digitar `peca.3mf` no nome troca o formato para 3MF.
+- Caracteres que o Windows não aceita (`< > : " / \ | ? *`) viram `_`.
+- A pasta é criada se não existir.
+- Ao concluir aparece "✔ Exportado", com tamanho, tempo e os botões **Mostrar na pasta** e **Abrir arquivo**.
+  No navegador, o arquivo é baixado.
+- Se algo falhar (arquivo aberto em outro programa, pasta sem permissão, modelo sem corpos), a causa aparece
+  em vermelho no próprio diálogo.
 
 ## 12. Estudos, otimização e macros
 
-- **Estudo paramétrico** (Ferramentas): varre um parâmetro (de, até, número de variantes) e mostra massa e
+- **Estudo paramétrico** (Gerenciar): varre um parâmetro (de, até, número de variantes) e mostra massa e
   volume de cada variante. Roda **em paralelo** em todos os núcleos (um kernel por núcleo). O documento atual
   não é alterado.
-- **Otimizar**: escolha as variáveis com faixas, um **objetivo** (por exemplo `mass`, `volume`, `sz`, ou uma
+- **Otimizar** (Gerenciar): escolha as variáveis com faixas, um **objetivo** (por exemplo `mass`, `volume`, `sz`, ou uma
   expressão) e **restrições** (uma por linha, como `sz <= 50` ou `esp >= 2`). O resultado traz o melhor
   conjunto e o botão **Aplicar ao modelo**.
-- **Macros** (Ferramentas): JavaScript com a API `cad`, executado como uma única operação desfazível.
+- **Macros** (Gerenciar): JavaScript com a API `cad`, executado como uma única operação desfazível.
   - `cad.<tipo>({...})` cria um recurso de qualquer tipo (`cad.box`, `cad.sketch`, `cad.extrude`, `cad.hole`,
     `cad.fillet`…);
   - `cad.param(nome, expr)` cria ou altera um parâmetro;
@@ -335,6 +361,9 @@ sua instalação, com botões de copiar.
 - **Com o app fechado**, o servidor sobe o kernel sozinho e renderiza por software. Se você abrir o app
   depois, ele se conecta à mesma sessão.
 - O histórico do que o Claude fez está em **Claude › Atividade**. Tudo pode ser desfeito com Ctrl+Z.
+- Se o Claude iniciar o kernel antes de você abrir o app, o app **assume o kernel** ao abrir, com o documento
+  que o Claude estava editando, e o Claude passa a trabalhar pela ponte. Se você fechar o app, o Claude
+  retoma o kernel com o documento salvo, sem perder nada.
 
 **Pedidos que funcionam bem:**
 
@@ -349,11 +378,11 @@ Referência completa das ferramentas: [referencia-mcp.md](referencia-mcp.md).
 
 ## 14. Recursos da máquina e opções
 
-- **Ferramentas › Recursos do sistema**: carga de cada núcleo da CPU, memória do sistema e do kernel,
+- **Gerenciar › Recursos do sistema**: carga de cada núcleo da CPU, memória do sistema e do kernel,
   workers ocupados e GPU (VRAM, uso e temperatura, via `nvidia-smi`).
 - O app desktop força a **GPU dedicada**. O backend usa até ¼ da RAM. Os workers usam até 4 GB cada e são
   encerrados após 60 s ociosos.
-- **Opções** (Ferramentas ou Arquivo):
+- **Opções** (Gerenciar ou Arquivo):
   - tema claro ou escuro;
   - estilo visual: sombreado com arestas, sombreado, aramado ou raio X;
   - qualidade de exibição;
@@ -364,7 +393,7 @@ Referência completa das ferramentas: [referencia-mcp.md](referencia-mcp.md).
 
 | Contexto | Teclas |
 |---|---|
-| Geral | Ctrl+N novo · Ctrl+O abrir · Ctrl+S salvar · Ctrl+Z desfazer · Ctrl+Y refazer · Ctrl+F pesquisar comandos · Ctrl+Shift+P parâmetros · Esc cancelar · Enter OK |
+| Geral | Ctrl+N novo · Ctrl+O abrir · Ctrl+S salvar · Ctrl+E exportar · Ctrl+Z desfazer · Ctrl+Y refazer · Ctrl+F pesquisar comandos · Ctrl+Shift+P parâmetros · Esc cancelar · Enter OK |
 | Modelo | S esboço · E extrusão · R revolução · H furo · F filete · Shift+K chanfro · Q pressionar/puxar · Shift+M mover corpo · J junta · M medir |
 | Esboço | L linha · C círculo · A arco · T retângulo · D cota · Delete excluir · Ctrl+Enter concluir · Esc sai da ferramenta e depois conclui |
 | Vista | Home zoom tudo · F2 pan · F3 zoom · F4 órbita · F5 vista anterior · F6 vista inicial |
@@ -382,4 +411,5 @@ Referência completa das ferramentas: [referencia-mcp.md](referencia-mcp.md).
 | A interface diz "Desconectado do kernel" | O processo do kernel encerrou (o app mostra o código de saída). Feche e reabra o Projetista e veja a causa em `Documentos\Projetista\projetista.log`. O documento está no salvamento automático |
 | Porta 7777 ocupada | Outro programa usa a porta. Feche-o, ou defina a variável `PROJETISTA_PORT` |
 | A GPU dedicada não é usada | Abra as ferramentas (F12), digite `chrome://gpu` na barra do DevTools, ou confira **Recursos do sistema**. Atualize o driver da placa |
+| A exportação mostra um erro em vermelho | Leia a causa no diálogo. "Arquivo aberto em outro programa": feche o arquivo no fatiador ou visualizador e exporte de novo. "Sem permissão": escolha outra pasta |
 | O Claude não vê o app | Confira se o caminho no JSON de configuração é o da instalação e se `ELECTRON_RUN_AS_NODE` está definido como `"1"` |

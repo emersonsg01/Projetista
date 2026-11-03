@@ -6,6 +6,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { Studio } from '../studio.js';
 import { startHub } from '../server/hub.js';
+import fs from 'node:fs';
+import path from 'node:path';
 import { RemoteStudio, findRunningApp } from './bridge.js';
 import { REFERENCE } from './reference.js';
 
@@ -176,20 +178,52 @@ ${hubUrl ? `O usuário acompanha tudo ao vivo em ${hubUrl}.` : ''}`,
 }
 
 export async function main() {
-  // Se o app desktop (ou a interface) já estiver aberto, o MCP vira uma PONTE para ele:
-  // o Claude trabalha no mesmo documento que está na tela e usa a GPU para renderizar.
+  // O MCP fala com um "alvo": o próprio kernel (sem app aberto) ou o app desktop (ponte).
+  // Quando o app abre, ele assume o kernel (handover) e o MCP passa a ser ponte; se o app
+  // fechar, o MCP volta a ter kernel próprio com o documento salvo pelo app.
+  let target = null;
+  let switching = null;
+  let local = null;
+  const proxy = { run: async (cmd, args, source) => { if (switching) await switching; return target.run(cmd, args, source); } };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const bridgeTo = async (info) => {
+    const rs = await RemoteStudio.connect(info.url);
+    rs.ws.on('close', () => { if (target === rs) switching = startLocal(info.workspace).finally(() => { switching = null; }); });
+    target = rs;
+    console.error(`[projetista] conectado ao app em ${info.url} (modo ponte)`);
+    return info.url;
+  };
+  const startLocal = async (appWorkspace) => {
+    if (!local) local = await Studio.create();
+    if (appWorkspace) {
+      // o app fechou: retoma o documento que ele salvou automaticamente
+      try { local.doc.load(JSON.parse(fs.readFileSync(path.join(appWorkspace, 'autosave.projetista.json'), 'utf8'))); } catch { /* sem salvamento */ }
+    }
+    target = local;
+    if (!process.env.PROJETISTA_NO_UI) {
+      await startHub(local, {
+        quiet: false, owner: 'mcp',
+        onHandover: () => {
+          switching = (async () => {
+            console.error('[projetista] o app desktop assumiu o kernel; passando para modo ponte');
+            for (let i = 0; i < 200; i++) {
+              const app = await findRunningApp();
+              if (app?.owner === 'app') { await bridgeTo(app); return; }
+              await sleep(150);
+            }
+            console.error('[projetista] o app não respondeu; mantendo o kernel próprio');
+            await startLocal();
+          })().finally(() => { switching = null; });
+        },
+      });
+    }
+    return `http://localhost:${Number(process.env.PROJETISTA_PORT) || 7777}`;
+  };
+
   const running = await findRunningApp();
-  let studio, url;
-  if (running) {
-    studio = await RemoteStudio.connect(running.url);
-    url = running.url;
-    console.error(`[projetista] conectado ao app em ${url} (modo ponte)`);
-  } else {
-    studio = await Studio.create();
-    const hub = process.env.PROJETISTA_NO_UI ? null : await startHub(studio, { quiet: false });
-    url = hub?.url;
-  }
-  const server = await createMcpServer(studio, url);
+  const url = running ? await bridgeTo(running) : await startLocal();
+  const server = await createMcpServer(proxy, url);
   await server.connect(new StdioServerTransport());
   console.error('[projetista] servidor MCP pronto (stdio)');
 }

@@ -1,5 +1,29 @@
 # Histórico de versões
 
+## 1.1.0 — 2026-11-03
+
+### Exportação
+- Novo diálogo **Exportar** (Ctrl+E, barra de acesso rápido, aba Exportar, Arquivo): formato em cartões,
+  corpos, precisão da malha, pasta e nome com prévia do caminho final, progresso e resultado com "Mostrar na
+  pasta" / "Abrir arquivo".
+- Correções: erros de exportação agora aparecem (antes falhavam em silêncio); extensão sempre coerente com o
+  formato (ou formato deduzido da extensão); pastas criadas automaticamente; nomes inválidos no Windows
+  corrigidos; mensagens claras para arquivo aberto em outro programa ou sem permissão; download no navegador
+  sem bloqueio de pop-up; exportação de malhas mais rápida (sem arestas de exibição, costuras em tempo linear).
+
+### Interface
+- Abas reorganizadas por tarefa (Modelo 3D, Inspecionar, Exportar, Gerenciar, Vista, Claude), botões e ícones
+  maiores, dicas ricas com descrição e atalho.
+- Instrução do comando ativo no topo da área 3D; cartão "Comece seu modelo" em documentos vazios; rótulos dos
+  planos de origem; restrições do esboço com nome; opções dos painéis com texto; ações rápidas no navegador
+  (editar, suprimir, ocultar, material) ao passar o mouse; diálogos que se ajustam para caber na tela.
+- Erros inesperados da interface viram avisos visíveis.
+
+### Robustez
+- O app desktop assume o kernel iniciado pelo Claude (MCP) sem perder o documento; o Claude passa a usar a
+  ponte e retoma o kernel se o app fechar.
+- Transações de comandos interrompidos (janela fechada/recarregada) são concluídas automaticamente.
+
 ## 1.0.0 — 2026-11-02
 
 Primeira versão.

@@ -393,9 +393,15 @@ export function tessellate(shape, { linDefl = 0.02, angDefl = 0.25, relative = f
     // arestas de costura (seam) de superfícies periódicas não são desenhadas, mas mantêm o índice
     const seams = new Set();
     const all = unique(shape, 'EDGE');
+    // índice geométrico: cada aresta de costura é localizada entre poucas candidatas
+    const byKey = new Map();
+    all.forEach((e, i) => { const k = edgeKey(e); (byKey.get(k) || byKey.set(k, []).get(k)).push(i); });
     for (const f of faces) {
       const seen = [];
-      for (const e of explore(f, 'EDGE')) { if (seen.some((x) => x.IsSame(e))) all.forEach((u, i) => { if (u.IsSame(e)) seams.add(i); }); else seen.push(e); }
+      for (const e of explore(f, 'EDGE')) {
+        if (seen.some((x) => x.IsSame(e))) for (const i of byKey.get(edgeKey(oc.TopoDS.Edge(e))) || []) { if (all[i].IsSame(e)) seams.add(i); }
+        else seen.push(e);
+      }
     }
     out.edges = all.map((e, i) => (seams.has(i) ? [] : edgePolyline(e, angDefl / 2, linDefl)));
   }

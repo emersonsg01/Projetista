@@ -21,7 +21,7 @@ export function startSketch() {
   if (app.sketching) return;
   app.vp.showOrigin({ XY: true, XZ: true, YZ: true, axes: true });
   app.vp.hoverFilter = { faces: true, planes: true };
-  setPrompt('Selecione um plano de origem ou uma face plana para criar o esboço  (Esc cancela)');
+  setPrompt('Clique num plano de origem (XY, XZ, YZ) ou numa face plana para começar o esboço', true);
   app.planePick = async (e) => {
     const hit = app.vp.pick(e, { faces: true, planes: true });
     if (!hit) return;
@@ -330,7 +330,7 @@ class Session {
   status() {
     const i = this.info;
     const msg = i.status === 'conflito' ? '⚠ Restrições em conflito' : i.dof === 0 ? 'Esboço totalmente restrito' : `${i.dof} grau(s) de liberdade — adicione cotas ou restrições`;
-    setPrompt(`${this.toolPrompt || 'Esboço'} · ${msg} · ${i.profiles} perfil(is) fechado(s)`);
+    setPrompt(`${this.toolPrompt || 'Esboço — escolha uma ferramenta em Desenhar'} · ${msg} · ${i.profiles} perfil(is) fechado(s)`, true, this.toolState ? 'sai da ferramenta' : 'conclui o esboço');
   }
 
   // ---------------------------------------------------------- seleção na tela

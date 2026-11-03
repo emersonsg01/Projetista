@@ -67,7 +67,7 @@ function weld(pos) {
 let exportQuality = 'fine';
 export function setExportQuality(q) { exportQuality = q; }
 function meshArrays(m) {
-  if (m.tess) { const t = m.tess(exportQuality); return { pos: Float32Array.from(t.positions), tri: t.indices }; }
+  if (m.meshFor) { const t = m.meshFor(exportQuality); return { pos: Float32Array.from(t.positions), tri: t.indices }; }
   const g = m.getMesh();
   const n = g.numProp;
   const pos = new Float32Array((g.vertProperties.length / n) * 3);

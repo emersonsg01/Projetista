@@ -98,8 +98,8 @@ foi copiado.
 
 | Elemento | Como funciona |
 |---|---|
-| **Barra de título + acesso rápido** | Novo, Abrir, Salvar, Desfazer/Refazer com o nome da ação, Reconstruir, material e cor do corpo selecionado e busca de comandos (Ctrl+F). No app desktop fica dentro da própria barra da janela |
-| **Faixa de opções** | Abas Arquivo, Modelo 3D, Anotar, Inspecionar, Ferramentas, Gerenciar, Vista e Claude, com painéis de botões grandes e pequenos. Duplo clique numa aba recolhe a faixa. A aba contextual **Esboço** aparece durante a edição |
+| **Barra de título + acesso rápido** | Novo, Abrir, Salvar, **Exportar (Ctrl+E)**, Desfazer/Refazer com o nome da ação, Reconstruir, material e cor do corpo selecionado e busca de comandos (Ctrl+F). No app desktop fica dentro da própria barra da janela |
+| **Faixa de opções** | Abas por tarefa — Modelo 3D, Inspecionar, **Exportar**, Gerenciar, Vista e Claude — com botões grandes e pequenos e dicas que explicam cada comando. Duplo clique numa aba recolhe a faixa. A aba contextual **Esboço** aparece durante a edição |
 | **Arquivo (backstage)** | Novo, Abrir, Salvar, Salvar como, Importar, Exportar, Desenho técnico, iPropriedades, Opções e documentos recentes |
 | **Navegador do modelo** | Corpos sólidos (mostrar/ocultar, material, renomear), Origem (planos e eixos), recursos com esboços aninhados sob quem os usa, erros em vermelho e **Fim da peça** arrastável para retroceder a linha do tempo. Duplo clique edita; botão direito abre o menu de contexto |
 | **Painel de propriedades** | Flutua sobre a vista, com seções recolhíveis (Entrada geométrica, Comportamento, Saída, Configurações avançadas). A pré-visualização é ao vivo e tem OK, Cancelar e **+** (aplicar e continuar). Cancelar desfaz tudo; OK vira uma única entrada no histórico |

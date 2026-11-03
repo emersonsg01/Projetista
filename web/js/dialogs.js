@@ -67,14 +67,127 @@ export async function importMesh() {
   const f = await chooseFile(['stl', 'obj']);
   if (f) await rpc('add_feature', { feature: { type: 'import_mesh', file: f } }).then((r) => r.errors?.length && toast(r.errors[0], 'err'));
 }
-export async function exportAs(fmtName) {
-  const target = await chooseSave(`${slug(app.state?.name)}.${fmtName}`, [fmtName]);
-  if (!target) return;
-  const r = await rpc('export', { format: fmtName, file: target, quality: app.settings.exportQuality || 'fine' });
-  toast(`Exportado (${(r.bytes / 1024).toFixed(0)} kB): ${r.file}`);
-  if (desktop()) window.projetista.showFile(r.file);
-  else window.open(`/files/${encodeURIComponent(fileName(r.file))}`, '_blank');
+// ---------------------------------------------------------------- exportação
+export const EXPORT_FORMATS = [
+  { id: 'step', ext: 'step', name: 'STEP', icon: 'stepFile', desc: 'Geometria exata (B-rep). Para SolidWorks, Inventor, Fusion, FreeCAD e usinagem (CAM).' },
+  { id: 'stl', ext: 'stl', name: 'STL', icon: 'stlFile', desc: 'Malha de triângulos. Padrão da impressão 3D.', mesh: true },
+  { id: '3mf', ext: '3mf', name: '3MF', icon: 'mfFile', desc: 'Malha com cores e materiais. Ideal para Orca, Bambu e Prusa.', mesh: true },
+  { id: 'obj', ext: 'obj', name: 'OBJ', icon: 'objFile', desc: 'Malha simples, aceita por quase todo software 3D.', mesh: true },
+  { id: 'glb', ext: 'glb', name: 'GLB', icon: 'glbFile', desc: 'glTF binário com cores. Web, realidade aumentada, Blender.', mesh: true },
+  { id: 'svg', ext: 'svg', name: 'Desenho SVG', icon: 'drawing', desc: 'Folha A3/A4 com vistas, linhas ocultas, cotas e carimbo.' },
+];
+const QUALITIES = [['normal', 'Normal', '0,02 mm'], ['fine', 'Fina', '0,005 mm'], ['ultra', 'Ultra', '0,001 mm']];
+const extToFormat = (ext) => EXPORT_FORMATS.find((f) => f.ext === ext || (f.id === 'step' && ext === 'stp'))?.id;
+
+/** Baixa um arquivo da pasta de projetos pelo navegador (sem bloqueio de pop-up). */
+function download(href, name) {
+  const a = h('a', { href: `${href}${href.includes('?') ? '&' : '?'}download`, download: name, style: { display: 'none' } });
+  document.body.append(a); a.click(); a.remove();
 }
+
+export async function exportAs(fmtName) { return exportDialog({ format: fmtName }); }
+
+export async function exportDialog(opts = {}) {
+  const st = app.settings;
+  const sep = desktop() ? '\\' : '/';
+  const s = {
+    format: opts.format || st.lastExportFormat || 'step',
+    which: app.selectedBody ? 'selected' : 'all',
+    picked: new Set(app.selectedBody ? [app.selectedBody] : bodyNames()),
+    quality: st.exportQuality || 'fine',
+    projection: opts.projection || 'first', sheet: opts.sheet || 'A3', title: opts.title || app.state?.name || '',
+    folder: st.exportDir || (desktop() ? `${await window.projetista.homeDir?.() || ''}${sep}Exportações` : 'Exportações'),
+    name: slug(app.state?.name),
+    after: st.exportAfter ?? true,
+    busy: false, result: null, error: null,
+  };
+  const d = dialog({ id: 'export', title: 'Exportar', iconName: 'export', width: 720, body: (b) => render(b) });
+  function current() { return EXPORT_FORMATS.find((f) => f.id === s.format) || EXPORT_FORMATS[0]; }
+  // no Windows, normaliza separadores; a pasta precisa ser completa (C:\… ou \\servidor\…)
+  function folderNorm() { return (desktop() ? s.folder.trim().replace(/\//g, '\\') : s.folder.trim()).replace(/[\\/]+$/, ''); }
+  function folderOk() { return !desktop() || /^([a-zA-Z]:\\|\\\\[^\\]+\\)/.test(`${folderNorm()}\\`); }
+  function target() { return `${folderNorm()}${sep}${s.name || 'modelo'}.${current().ext}`; }
+  function render(b) {
+    b.innerHTML = '';
+    const f = current();
+    const bodies = bodyNames();
+    // 1. formato
+    const cards = h('div', { class: 'fmt-grid' }, ...EXPORT_FORMATS.map((x) => h('button', { class: `fmt ${x.id === s.format ? 'on' : ''}`, onclick: () => { s.format = x.id; s.result = s.error = null; render(b); } },
+      h('span', { class: 'ico', html: icon(x.icon) }), h('b', {}, x.name), h('span', { class: 'muted' }, x.desc))));
+    // 2. o que exportar
+    const which = h('div', { class: 'exp-row' }, h('span', { class: 'exp-label' }, 'Corpos'),
+      h('div', { class: 'seg' },
+        h('button', { class: s.which === 'all' ? 'on' : '', onclick: () => { s.which = 'all'; render(b); } }, `Todos (${bodies.length})`),
+        h('button', { class: s.which === 'selected' ? 'on' : '', onclick: () => { s.which = 'selected'; render(b); } }, 'Escolher…')));
+    const pick = s.which === 'selected' ? h('div', { class: 'exp-bodies' }, ...bodies.map((n) => {
+      const cb = h('input', { type: 'checkbox', checked: s.picked.has(n) });
+      cb.addEventListener('change', () => { cb.checked ? s.picked.add(n) : s.picked.delete(n); render(b); });
+      return h('label', {}, cb, n);
+    })) : '';
+    // 3. opções do formato
+    const extra = f.mesh
+      ? h('div', { class: 'exp-row' }, h('span', { class: 'exp-label' }, 'Precisão da malha'), h('div', { class: 'seg' }, ...QUALITIES.map(([v, l, tol]) => h('button', { class: s.quality === v ? 'on' : '', title: `Erro cordal máximo ${tol}`, onclick: () => { s.quality = v; render(b); } }, `${l} · ${tol}`))))
+      : f.id === 'svg'
+        ? h('div', { class: 'exp-row' }, h('span', { class: 'exp-label' }, 'Desenho'),
+          h('div', { class: 'seg' }, ...[['first', '1º diedro (ABNT)'], ['third', '3º diedro (ANSI)']].map(([v, l]) => h('button', { class: s.projection === v ? 'on' : '', onclick: () => { s.projection = v; render(b); } }, l))),
+          h('div', { class: 'seg' }, ...['A3', 'A4'].map((v) => h('button', { class: s.sheet === v ? 'on' : '', onclick: () => { s.sheet = v; render(b); } }, v))))
+        : h('div', { class: 'exp-row' }, h('span', { class: 'exp-label' }, 'Precisão'), h('span', { class: 'muted' }, 'Exata — as superfícies são gravadas como B-rep, sem aproximação por triângulos.'));
+    // 4. destino
+    const folder = h('input', { value: s.folder, readonly: !desktop() ? true : undefined });
+    folder.addEventListener('change', () => { s.folder = folder.value; render(b); });
+    const name = h('input', { value: s.name, spellcheck: 'false' });
+    name.addEventListener('change', () => {
+      // se o usuário digitar uma extensão conhecida, o formato acompanha
+      const m = name.value.trim().match(/^(.*)\.([a-z0-9]{2,4})$/i);
+      // caracteres proibidos em nomes de arquivo do Windows viram "_"
+      const clean = (t) => t.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/[. ]+$/, '');
+      if (m && extToFormat(m[2].toLowerCase())) { s.name = clean(m[1]); s.format = extToFormat(m[2].toLowerCase()); } else s.name = clean(name.value.trim());
+      render(b);
+    });
+    const dest = h('div', { class: 'exp-dest' },
+      h('label', { class: 'exp-row' }, h('span', { class: 'exp-label' }, 'Pasta'), folder, desktop() ? h('button', { onclick: async () => { const p = await window.projetista.pickFolder({ defaultPath: s.folder }); if (p) { s.folder = p; render(b); } } }, 'Procurar…') : h('span', { class: 'muted small' }, 'pasta de projetos')),
+      h('label', { class: 'exp-row' }, h('span', { class: 'exp-label' }, 'Nome do arquivo'), name, h('span', { class: 'exp-ext' }, `.${f.ext}`)),
+      h('label', { class: 'exp-row check' }, (() => { const c = h('input', { type: 'checkbox', checked: s.after }); c.addEventListener('change', () => { s.after = c.checked; }); return c; })(), desktop() ? 'Mostrar o arquivo na pasta ao concluir' : 'Baixar o arquivo ao concluir'),
+      folderOk() ? h('div', { class: 'exp-final' }, 'Arquivo final: ', h('code', {}, target()))
+        : h('div', { class: 'exp-status err' }, '⚠ Informe a pasta completa (por exemplo C:\\Users\\voce\\Documents) ou use Procurar…'));
+    // 5. situação
+    const status = s.busy ? h('div', { class: 'exp-status busy' }, h('span', { class: 'spinner' }), `Exportando ${f.name}…`)
+      : s.error ? h('div', { class: 'exp-status err' }, '⚠ ', s.error)
+        : s.result ? h('div', { class: 'exp-status ok' }, h('div', {}, '✔ Exportado: ', h('b', {}, fileName(s.result.file)), ` (${fmtSize(s.result.bytes)}${s.result.ms !== undefined ? ` em ${s.result.ms} ms` : ''})`),
+          h('div', { class: 'muted small' }, s.result.file),
+          h('div', { class: 'row' }, desktop() ? h('button', { onclick: () => window.projetista.showFile(s.result.file) }, 'Mostrar na pasta') : '', desktop() ? h('button', { onclick: () => window.projetista.openExternal(s.result.file) }, 'Abrir arquivo') : '',
+            !desktop() && s.result.download ? h('button', { onclick: () => download(s.result.download, fileName(s.result.file)) }, 'Baixar de novo') : ''))
+          : '';
+    const noBodies = !bodies.length;
+    const canGo = !s.busy && !noBodies && (s.which === 'all' || s.picked.size > 0) && s.name && folderOk();
+    b.append(
+      h('div', { class: 'exp-step' }, h('span', { class: 'n' }, '1'), 'Formato'), cards,
+      h('div', { class: 'exp-step' }, h('span', { class: 'n' }, '2'), 'Conteúdo e precisão'), which, pick, extra,
+      h('div', { class: 'exp-step' }, h('span', { class: 'n' }, '3'), 'Destino'), dest,
+      noBodies ? h('div', { class: 'exp-status err' }, '⚠ O modelo ainda não tem corpos sólidos. Crie um recurso antes de exportar.') : status,
+      h('div', { class: 'exp-actions' }, h('button', { onclick: () => d.close() }, 'Fechar'), h('button', { class: 'primary big', disabled: !canGo || undefined, onclick: () => go(b) }, `Exportar ${f.name}`)));
+  }
+  async function go(b) {
+    const f = current();
+    s.busy = true; s.error = s.result = null; render(b);
+    const bodies = s.which === 'all' ? undefined : [...s.picked];
+    const file = desktop() ? target() : `${s.folder}/${s.name}.${f.ext}`;
+    try {
+      s.result = f.id === 'svg'
+        ? await rpc('drawing', { file, bodies, projection: s.projection, sheet: s.sheet, title: s.title, hiddenLines: true })
+        : await rpc('export', { format: f.id, file, bodies, quality: s.quality });
+      Object.assign(st, { lastExportFormat: f.id, exportQuality: s.quality, exportAfter: s.after, ...(desktop() ? { exportDir: folderNorm() } : {}) });
+      saveSettings();
+      if (s.after) { if (desktop()) window.projetista.showFile(s.result.file); else if (s.result.download) download(s.result.download, fileName(s.result.file)); }
+      toast(`Exportado: ${fileName(s.result.file)}`);
+    } catch (e) {
+      s.error = e.message;
+    }
+    s.busy = false;
+    render(b);
+  }
+}
+const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} kB`);
 
 // ---------------------------------------------------------------- backstage (Arquivo)
 export function backstage() {
@@ -88,7 +201,7 @@ export function backstage() {
     item('new', 'Novo', newDocument, 'Peça (mm)'), item('open', 'Abrir', openDocument), item('save', 'Salvar', () => saveDocument()), item('saveAs', 'Salvar como', () => saveDocument(true)),
     h('div', { class: 'bs-sep' }),
     item('importStep', 'Importar STEP', () => import('./commands.js').then((m) => m.runCommand('import_step'))), item('import', 'Importar STL/OBJ', importMesh),
-    item('stepFile', 'Exportar STEP', () => exportAs('step')), item('stlFile', 'Exportar STL', () => exportAs('stl')), item('mfFile', 'Exportar 3MF', () => exportAs('3mf')), item('glbFile', 'Exportar GLB', () => exportAs('glb')),
+    item('export', 'Exportar…', () => exportDialog(), 'STEP, STL, 3MF, OBJ, GLB, SVG'),
     item('drawing', 'Desenho técnico', drawingDialog),
     h('div', { class: 'bs-sep' }),
     item('iprops', 'iPropriedades', ipropsDialog), item('options', 'Opções', optionsDialog), item('claude', 'Conectar o Claude', claudeDialog));
@@ -207,7 +320,7 @@ export function drawingDialog() {
         const r = await rpc('drawing', { projection: proj.value, sheet: sheet.value, hiddenLines: hidden.checked, title: title.value }).catch((e) => { view.textContent = e.message; });
         if (!r) return;
         file = r.file;
-        svgText = await fetch(`/files/${encodeURIComponent(fileName(r.file))}`).then((x) => x.text());
+        svgText = await fetch(r.download || `/files/${encodeURIComponent(fileName(r.file))}`).then((x) => x.text());
         view.innerHTML = svgText;
         const s = view.querySelector('svg'); s.removeAttribute('height'); s.style.width = `${100 * zoom}%`; s.style.height = 'auto';
       };
@@ -215,7 +328,7 @@ export function drawingDialog() {
       gen();
     },
     buttons: [
-      { label: 'Salvar SVG como…', action: async () => { if (!svgText) return; const t = await chooseSave(`${slug(app.state?.name)}-desenho.svg`, ['svg']); if (!t) return; const r = await rpc('drawing', { file: t }); toast(`Salvo: ${r.file}`); } },
+      { label: 'Exportar SVG…', action: () => exportDialog({ format: 'svg' }) },
       { label: 'Abrir no visualizador do sistema', action: () => { if (file) desktop() ? window.projetista.openExternal(file) : window.open(`/files/${encodeURIComponent(fileName(file))}`, '_blank'); } },
       { label: 'Fechar', primary: true, action: ({ close }) => close() },
     ],
@@ -413,7 +526,7 @@ export function toggleTheme() { app.settings.theme = app.settings.theme === 'dar
 export function setStyle(s) { app.settings.style = app.vp.style === s ? 'shadedEdges' : s; saveSettings(); app.vp.setStyle(app.settings.style); window.dispatchEvent(new Event('ribbon-refresh')); }
 export function setProjection(p) { app.settings.projection = p; saveSettings(); app.vp.setProjection(p); window.dispatchEvent(new Event('ribbon-refresh')); }
 export function lookAtCommand() {
-  setPrompt('Olhar para: clique numa face plana');
+  setPrompt('Olhar para: clique numa face plana', true);
   app.vp.hoverFilter = { faces: true };
   app.oneShotPick = async (e) => {
     const hit = app.vp.pick(e, { faces: true });
@@ -501,7 +614,7 @@ export function activityDialog() {
     b.innerHTML = '';
     const list = [...(app.activities || [])].reverse();
     if (!list.length) b.append(h('div', { class: 'muted' }, 'Nenhuma atividade ainda.'));
-    for (const a of list.slice(0, 80)) b.append(h('div', { class: `act ${a.source}` }, h('span', { class: 'muted' }, new Date(a.time).toLocaleTimeString('pt-BR')), a.source === 'claude' ? h('b', {}, ' ✦ Claude: ') : ' ', a.label));
+    for (const a of list.slice(0, 80)) b.append(h('div', { class: `act-row ${a.source}` }, h('span', { class: 'muted' }, new Date(a.time).toLocaleTimeString('pt-BR')), a.source === 'claude' ? h('b', {}, ' ✦ Claude: ') : ' ', a.label));
   }
   d.refresh = () => render(d.body);
   app.onStateDialogs.add(d);

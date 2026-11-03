@@ -24,6 +24,12 @@ export class Solid {
     }
     return this._mesh;
   }
+  /** Malha para exportação (sem arestas de exibição), em cache por qualidade. */
+  meshFor(quality = 'fine') {
+    this._meshes ||= new Map();
+    if (!this._meshes.has(quality)) this._meshes.set(quality, occ.tessellate(this.shape, { ...(QUALITY[quality] || QUALITY.fine), edges: false }));
+    return this._meshes.get(quality);
+  }
   /** Formato compatível com o renderizador: vértices + triângulos. */
   getMesh() {
     const t = this.tess();

@@ -14,6 +14,9 @@ import { icon } from './icons.js';
 
 app.onStateDialogs = new Set();
 app.activities = [];
+// nenhuma falha fica silenciosa: todo erro não tratado vira um aviso visível
+addEventListener('unhandledrejection', (e) => { toast(e.reason?.message || String(e.reason), 'err'); e.preventDefault(); });
+addEventListener('error', (e) => { if (e.message) toast(`Erro na interface: ${e.message}`, 'err'); });
 if (window.projetista?.desktop) document.body.classList.add('desktop');
 
 // ---------------------------------------------------------------- viewport
@@ -43,7 +46,10 @@ rpc.on('state', (m) => {
   updateChrome();
   activePanel()?.updateStatus();
   for (const d of [...app.onStateDialogs]) { if (!d.el.isConnected) app.onStateDialogs.delete(d); else d.refresh?.(); }
-  if (first && !m.state.features.length) showHome(true);
+  // a página Início abre sozinha num documento vazio e sai sozinha quando o modelo ganha recursos
+  // (por exemplo, quando o Claude começa a modelar)
+  if (first && !m.state.features.length) { app.homeAuto = true; showHome(true); }
+  else if (app.homeAuto && m.state.features.length) { app.homeAuto = false; showHome(false); }
 });
 rpc.on('activities', (m) => { app.activities = m.activities || []; });
 rpc.on('activity', (m) => {
@@ -130,7 +136,7 @@ function buildChrome() {
   });
   const col = h('input', { type: 'color', id: 'qatColor', title: 'Aparência (cor do corpo selecionado)' });
   col.addEventListener('change', () => { if (!app.selectedBody) { toast('Selecione um corpo para mudar a aparência.', 'warn'); return; } rpc.rpc('add_feature', { feature: { type: 'appearance', body: app.selectedBody, color: col.value } }); });
-  qat.append(q('new'), q('open'), q('save'), h('span', { class: 'qsep' }), q('undo'), q('redo'), h('span', { class: 'qsep' }), q('rebuild'), h('span', { class: 'qsep' }), mat, col);
+  qat.append(q('new'), q('open'), q('save'), q('exportDialog'), h('span', { class: 'qsep' }), q('undo'), q('redo'), h('span', { class: 'qsep' }), q('rebuild'), h('span', { class: 'qsep' }), mat, col);
   $('#appBtn').innerHTML = icon('app');
   $('#appBtn').onclick = () => D.backstage();
 
@@ -156,8 +162,8 @@ function buildChrome() {
   $('#navHome').innerHTML = icon('home');
 
   // abas de documento
-  $('#tabHome').onclick = () => showHome(true);
-  $('#tabDoc').onclick = () => showHome(false);
+  $('#tabHome').onclick = () => { app.homeAuto = false; showHome(true); };
+  $('#tabDoc').onclick = () => { app.homeAuto = false; showHome(false); };
   window.addEventListener('doc-tab', (e) => showHome(e.detail === 'home'));
 
   // divisor do navegador
@@ -250,6 +256,29 @@ window.projetista?.onMenu?.((m) => {
   else if (map[m.action]) runCommand(map[m.action]);
 });
 
+// ---------------------------------------------------------------- cartão "Comece aqui" (documento vazio)
+function buildEmpty() {
+  const el = $('#empty');
+  const act = (ic, title, desc, fn) => h('button', { class: 'empty-act', onclick: fn }, h('span', { class: 'ico', html: icon(ic) }), h('b', {}, title), h('span', { class: 'muted' }, desc));
+  el.append(h('div', { class: 'empty-card' },
+    h('h2', {}, 'Comece seu modelo'),
+    h('p', { class: 'muted' }, 'Escolha um ponto de partida — tudo pode ser editado depois.'),
+    h('div', { class: 'empty-actions' },
+      act('sketch2d', 'Desenhar um esboço', 'Perfil 2D para extrudar ou revolver', () => runCommand('sketch2d')),
+      act('box', 'Criar uma caixa', 'Um sólido pronto, com medidas editáveis', () => runCommand('box')),
+      act('importStep', 'Importar STEP', 'Trazer uma peça de outro CAD', () => runCommand('import_step')),
+      act('part', 'Abrir um exemplo', 'Suporte, flange ou caixa com tampa', () => showHome(true))),
+    h('div', { class: 'empty-tips' },
+      h('span', {}, h('kbd', {}, 'Botão esquerdo'), ' girar'), h('span', {}, h('kbd', {}, 'Botão do meio'), ' deslocar'),
+      h('span', {}, h('kbd', {}, 'Roda'), ' zoom'), h('span', {}, h('kbd', {}, 'Botão direito'), ' menu rápido'), h('span', {}, h('kbd', {}, 'Ctrl+F'), ' pesquisar comandos'))));
+}
+function updateEmpty() {
+  const show = !!app.state && !app.state.features.length && !app.sketching && !app.planePick && !activePanel() && $('#home').classList.contains('hidden');
+  $('#empty').classList.toggle('hidden', !show);
+}
+setInterval(updateEmpty, 250);
+
 buildChrome();
+buildEmpty();
 renderRibbon();
 setTab('model');

@@ -3,6 +3,7 @@
 import { rpc } from './rpc.js';
 import { app } from './store.js';
 import { h, ico, $, contextMenu, toast, ask } from './ui.js';
+import { icon } from './icons.js';
 import { editFeature } from './commands.js';
 import { appearanceDialog, ipropsDialog, jsonEditDialog } from './dialogs.js';
 
@@ -26,7 +27,8 @@ export function renderBrowser() {
       oncontextmenu: (e) => { e.preventDefault(); e.stopPropagation(); if (opts.menu) contextMenu(e.clientX, e.clientY, opts.menu()); },
     },
     opts.toggle !== undefined ? h('span', { class: 'tw', onclick: (e) => { e.stopPropagation(); open.has(opts.toggle) ? open.delete(opts.toggle) : open.add(opts.toggle); renderBrowser(); } }, open.has(opts.toggle) ? '▾' : '▸') : h('span', { class: 'tw' }),
-    ico(opts.icon), h('span', { class: 'nm' }, opts.label), opts.badge ? h('span', { class: 'badge' }, opts.badge) : '', opts.extra || '');
+    ico(opts.icon), h('span', { class: 'nm' }, opts.label), opts.badge ? h('span', { class: 'badge' }, opts.badge) : '', opts.extra || '',
+    ...(opts.actions || []).map((a) => h('button', { class: 'act', title: a.title, html: icon(a.icon), onclick: (e) => { e.stopPropagation(); a.fn(); } })));
     if (opts.drop) { row.addEventListener('dragover', (e) => { e.preventDefault(); row.classList.add('drop'); }); row.addEventListener('dragleave', () => row.classList.remove('drop')); row.addEventListener('drop', (e) => { e.preventDefault(); row.classList.remove('drop'); opts.drop(); }); }
     tree.append(row);
     return row;
@@ -43,6 +45,7 @@ export function renderBrowser() {
       node({
         icon: 'body', label: b.name, depth: 2, cls: hidden ? 'dim' : '', selected: app.selectedBody === b.name, title: `${b.material} · ${b.volume_mm3} mm³`,
         extra: h('span', { class: 'sw', style: { background: b.color } }),
+        actions: [{ icon: hidden ? 'eye' : 'eyeOff', title: hidden ? 'Mostrar' : 'Ocultar', fn: () => toggleBody(b.name) }, { icon: 'appearance', title: 'Material e aparência', fn: () => appearanceDialog(b.name) }],
         onclick: () => { app.selectedBody = b.name; app.vp.setSelection([{ kind: 'body', body: b.name }]); renderBrowser(); },
         menu: () => [
           { label: hidden ? 'Mostrar' : 'Ocultar', icon: hidden ? 'eye' : 'eyeOff', action: () => toggleBody(b.name) },
@@ -77,6 +80,7 @@ export function renderBrowser() {
     node({
       icon: ICON[f.type] || 'part', label: f.name, depth, cls, selected: app.selectedFeature === f.name, title: st.error || (st.warnings || []).join('\n') || `${f.type}${st.ms !== undefined ? ` · ${st.ms} ms` : ''}`,
       toggle: kids.length ? key : undefined, badge: st.state === 'error' ? '⚠' : '',
+      actions: [{ icon: 'edit', title: f.type === 'sketch' ? 'Editar esboço' : 'Editar recurso', fn: () => editFeature(f.name) }, { icon: f.suppressed ? 'eye' : 'eyeOff', title: f.suppressed ? 'Reativar' : 'Suprimir', fn: () => rpc('suppress_feature', { name: f.name, suppressed: !f.suppressed }) }],
       onclick: () => { app.selectedFeature = f.name; renderBrowser(); },
       ondblclick: () => editFeature(f.name),
       drop: () => rpc('set_rollback', { index: i + 1 }),

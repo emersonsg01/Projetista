@@ -17,6 +17,7 @@ app.commandLine.appendSwitch('enable-features', 'CanvasOopRasterization');
 app.commandLine.appendSwitch('js-flags', `--max-old-space-size=${Math.min(8192, Math.floor(os.totalmem() / 2 ** 20 / 8))}`);
 
 const PORT = Number(process.env.PROJETISTA_PORT) || 7777;
+let port = PORT; // pode mudar se a porta padrão estiver presa por um kernel antigo
 const ROOT = path.join(__dirname, '..');
 const HOME = process.env.PROJETISTA_HOME || path.join(app.getPath('documents'), 'Projetista');
 let backend = null;
@@ -29,33 +30,57 @@ app.on('second-instance', (_e, argv) => {
   if (file) win?.webContents.send('menu', { action: 'open-path', file });
 });
 
-function ping() {
+function request(method, pathname, timeout = 1500) {
   return new Promise((resolve) => {
-    const req = http.get({ host: '127.0.0.1', port: PORT, path: '/api/info', timeout: 700 }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port, path: pathname, method, timeout }, (res) => {
       let b = '';
+      res.setEncoding('utf8');
       res.on('data', (c) => (b += c));
-      res.on('end', () => { try { resolve(JSON.parse(b).app === 'projetista'); } catch { resolve(false); } });
+      res.on('end', () => { try { resolve({ status: res.statusCode, body: JSON.parse(b) }); } catch { resolve(null); } });
     });
-    req.on('error', () => resolve(false));
-    req.on('timeout', () => { req.destroy(); resolve(false); });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+    req.end();
+  });
+}
+async function info() { const r = await request('GET', '/api/info', 700); return r?.body?.app === 'projetista' ? r.body : null; }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function freePort(start) {
+  return new Promise((resolve) => {
+    const srv = require('node:net').createServer();
+    srv.once('error', () => resolve(freePort(start + 1)));
+    srv.listen(start, '127.0.0.1', () => srv.close(() => resolve(start)));
   });
 }
 
 async function startBackend() {
-  if (await ping()) return; // já existe um Projetista rodando (ex.: iniciado pelo Claude)
   fs.mkdirSync(HOME, { recursive: true });
+  const existing = await info();
+  if (existing?.owner === 'app') return; // outro backend do próprio app (ex.: modo desenvolvimento)
+  if (existing) {
+    // Um kernel iniciado pelo Claude (MCP) ocupa a porta: o app assume. O documento aberto
+    // nele é preservado e o MCP passa a operar como ponte para este app.
+    const r = await request('POST', '/api/handover', 15000);
+    if (r?.status === 200 && r.body?.document) {
+      fs.writeFileSync(path.join(HOME, 'autosave.projetista.json'), JSON.stringify(r.body.document));
+      for (let i = 0; i < 50 && (await info()); i++) await sleep(100);
+    } else {
+      // kernel de versão antiga (sem passagem de controle): o app usa o próprio kernel noutra porta
+      port = await freePort(PORT + 1);
+    }
+  }
   // heap do processo principal do kernel: 1/4 da RAM, até 16 GB
   const heap = Math.min(16384, Math.floor(os.totalmem() / 2 ** 20 / 4));
   backend = spawn(process.execPath, [`--max-old-space-size=${heap}`, path.join(ROOT, 'src', 'cli.js'), 'app'], {
     cwd: ROOT,
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PROJETISTA_HOME: HOME, PROJETISTA_PORT: String(PORT), PROJETISTA_EXE: process.execPath },
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PROJETISTA_HOME: HOME, PROJETISTA_PORT: String(port), PROJETISTA_EXE: process.execPath },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });
   const log = fs.createWriteStream(path.join(HOME, 'projetista.log'), { flags: 'a' });
   backend.stdout.pipe(log); backend.stderr.pipe(log);
   backend.on('exit', (code) => { if (code && win) dialog.showErrorBox('Projetista', `O kernel encerrou (código ${code}). Veja ${path.join(HOME, 'projetista.log')}`); });
-  for (let i = 0; i < 150; i++) { if (await ping()) return; await new Promise((r) => setTimeout(r, 100)); }
+  for (let i = 0; i < 150; i++) { if ((await info())?.owner === 'app') return; await sleep(100); }
   throw new Error('O kernel não respondeu em 15 s');
 }
 
@@ -77,7 +102,7 @@ async function createWindow() {
   win.once('ready-to-show', () => { win.maximize(); win.show(); });
   try {
     await startBackend();
-    await win.loadURL(`http://localhost:${PORT}/`);
+    await win.loadURL(`http://localhost:${port}/`);
     const file = process.argv.find((a) => a.endsWith('.projetista') || a.endsWith('.projetista.json'));
     if (file) win.webContents.once('did-finish-load', () => win.webContents.send('menu', { action: 'open-path', file }));
   } catch (e) {
@@ -91,10 +116,16 @@ ipcMain.handle('pick-file', async (_e, { exts } = {}) => {
   const r = await dialog.showOpenDialog(win, { defaultPath: HOME, properties: ['openFile'], filters: [{ name: (exts || []).join(', ').toUpperCase(), extensions: exts || ['*'] }, { name: 'Todos', extensions: ['*'] }] });
   return r.canceled ? null : r.filePaths[0];
 });
-ipcMain.handle('save-file', async (_e, { defaultName, exts } = {}) => {
-  const r = await dialog.showSaveDialog(win, { defaultPath: path.join(HOME, defaultName || 'modelo'), filters: [{ name: (exts || []).join(', ').toUpperCase(), extensions: exts || ['*'] }] });
+ipcMain.handle('save-file', async (_e, { defaultName, defaultPath, exts, filters } = {}) => {
+  const list = filters?.length ? filters : [{ name: (exts || []).join(', ').toUpperCase(), extensions: exts || ['*'] }];
+  const r = await dialog.showSaveDialog(win, { defaultPath: defaultPath || path.join(HOME, defaultName || 'modelo'), filters: list });
   return r.canceled ? null : r.filePath;
 });
+ipcMain.handle('pick-folder', async (_e, { defaultPath } = {}) => {
+  const r = await dialog.showOpenDialog(win, { defaultPath: defaultPath || HOME, properties: ['openDirectory', 'createDirectory'] });
+  return r.canceled ? null : r.filePaths[0];
+});
+ipcMain.handle('home-dir', () => HOME);
 ipcMain.handle('title-bar', (_e, theme) => {
   const dark = theme === 'dark';
   try { win.setTitleBarOverlay({ color: dark ? '#22262c' : '#e6e8eb', symbolColor: dark ? '#dfe3e8' : '#1e2228' }); } catch { /* sem overlay */ }

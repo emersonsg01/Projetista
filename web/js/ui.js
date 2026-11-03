@@ -29,7 +29,17 @@ export function toast(text, kind = '') {
   while (box.children.length > 5) box.lastChild.remove();
 }
 let basePrompt = 'Pronto';
-export function setPrompt(text) { $('#prompt').textContent = text || basePrompt; }
+/** Instrução do comando atual: na barra de status e, se `hint`, num aviso no topo da área 3D. */
+export function setPrompt(text, hint = false, escLabel = 'cancela') {
+  $('#prompt').textContent = text || basePrompt;
+  const pill = $('#hint');
+  if (!pill) return;
+  if (hint && text) {
+    pill.innerHTML = '';
+    pill.append(h('span', { class: 'hint-dot' }), h('span', { class: 'hint-text' }, text), h('span', { class: 'hint-esc' }, h('kbd', {}, 'Esc'), ` ${escLabel}`));
+    pill.classList.remove('hidden');
+  } else pill.classList.add('hidden');
+}
 export function setStatusRight(html) { $('#statusRight').innerHTML = html; }
 
 // ---------------------------------------------------------------- menu de contexto
@@ -66,8 +76,13 @@ export function dialog({ id, title, iconName, width = 520, height, body, buttons
   document.body.append(el);
   const r = el.getBoundingClientRect();
   el.style.left = `${x ?? Math.max(10, (innerWidth - r.width) / 2)}px`;
-  el.style.top = `${y ?? Math.max(60, (innerHeight - r.height) / 3)}px`;
+  el.style.top = `${y ?? Math.max(Math.min(150, innerHeight - r.height - 10), (innerHeight - r.height) / 3)}px`;
   draggable(el, head);
+  // se o conteúdo crescer (resultado, erro), o diálogo sobe para continuar inteiro na tela
+  new ResizeObserver(() => {
+    const b = el.getBoundingClientRect();
+    if (b.bottom > innerHeight - 8) el.style.top = `${Math.max(8, innerHeight - b.height - 8)}px`;
+  }).observe(el);
   el.addEventListener('pointerdown', () => { el.style.zIndex = ++zTop; });
   const d = { el, body: content, close, setTitle: (t) => { head.querySelector('.dlg-title').textContent = t; } };
   if (id) dialogs.set(id, d);

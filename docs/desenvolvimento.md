@@ -26,6 +26,8 @@ Outros testes:
 | Script | Cobre |
 |---|---|
 | `node tests/pool-test.mjs` | Estudo paramétrico e otimização em paralelo |
+| `node tests/handover.mjs` | Passagem de controle do kernel entre MCP e app (e retomada ao fechar o app) |
+| `PROJETISTA_PORT=<porta> LOAD_EXAMPLE=1 node tests/export-check.mjs <pasta>` | Exportação em todos os formatos, extensões, subpastas e mensagens de erro (com um kernel rodando na porta) |
 | `node tests/mcp-e2e.mjs` | MCP ponta a ponta (imagens em `tests/out/`). Com `PROJETISTA_PORT=7777` e o app aberto, testa o modo ponte |
 | `node tests/mcp-exe.mjs dist/win-unpacked/Projetista.exe` | MCP pelo executável empacotado |
 | `node tests/desktop-shot.mjs <png> [expressão]` | Captura a janela do app aberto com `--remote-debugging-port=9223` |

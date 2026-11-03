@@ -200,23 +200,32 @@ export class Studio {
         return { ...(sheet ? renderSheet(bl, o) : renderView(bl, o)), engine: 'software (CPU)' };
       },
       drawing: ({ bodies, projection, hiddenLines, file, title, sheet }) => {
+        if (!d.bodies.size) throw new Error('O modelo não tem corpos sólidos para desenhar.');
         const svg = technicalDrawing(d, { bodies, projection, hiddenLines, title, sheet });
-        const f = resolveFile(file || `${slug(d.name)}-desenho.svg`);
-        fs.writeFileSync(f, svg);
-        return { file: f, bytes: svg.length };
+        const f = outputPath(file, 'svg', `${slug(d.name)}-desenho`, ['svg']);
+        const buf = Buffer.from(svg);
+        writeOutput(f, buf);
+        return { file: f, bytes: buf.length, format: 'svg', download: downloadPath(f) };
       },
       export: ({ format, bodies, file, quality }) => {
-        const fmt = (format || 'step').toLowerCase().replace('stp', 'step');
+        // o formato vem do pedido ou, na falta dele, da extensão do arquivo; a extensão é
+        // sempre corrigida para combinar com o conteúdo gravado
+        let fmt = String(format || '').toLowerCase().replace(/^\./, '');
+        if (fmt === 'stp') fmt = 'step';
+        if (!fmt && file) fmt = formatFromExt(file);
+        fmt ||= 'step';
+        if (!EXPORTERS[fmt]) throw new Error(`Formato não suportado: ${format}. Use STEP, STL, 3MF, OBJ ou GLB (ou o desenho técnico para SVG).`);
+        if (!d.bodies.size) throw new Error('O modelo não tem corpos sólidos para exportar.');
         const bl = this.bodyList(bodies);
-        if (!bl.length) throw new Error('Nenhum corpo para exportar');
-        setExportQuality(quality || 'fine');
-        const data = { step: (b) => writeSTEP(b.map((x) => x.m.shape), b.map((x) => x.name)), stl: toSTL, obj: toOBJ, '3mf': to3MF, glb: toGLB }[fmt];
-        if (!data) throw new Error(`Formato não suportado: ${fmt} (step, stl, obj, 3mf, glb; svg via drawing)`);
-        const f = resolveFile(file || `${slug(d.name)}.${fmt}`);
-        const buf = data(bl);
-        fs.writeFileSync(f, buf);
-        return { file: f, bytes: buf.length, bodies: bl.map((b) => b.name) };
+        if (!bl.length) throw new Error(`Nenhum dos corpos pedidos existe: ${(bodies || []).join(', ')}`);
+        setExportQuality(['draft', 'normal', 'fine', 'ultra'].includes(quality) ? quality : 'fine');
+        const f = outputPath(file, EXPORTERS[fmt].ext[0], slug(d.name), EXPORTERS[fmt].ext);
+        const t0 = performance.now();
+        const buf = EXPORTERS[fmt].write(bl);
+        writeOutput(f, buf);
+        return { file: f, bytes: buf.length, format: fmt, bodies: bl.map((b) => b.name), ms: Math.round(performance.now() - t0), download: downloadPath(f) };
       },
+      export_formats: () => Object.fromEntries(Object.entries(EXPORTERS).map(([k, v]) => [k, { ext: v.ext, label: v.label }])),
       catalog: () => ({
         features: Object.fromEntries(Object.entries(FEATURES).map(([k, v]) => [k, v.label])),
         materials: Object.fromEntries(Object.entries(MATERIALS).map(([k, v]) => [k, `${v.density} g/cm³ · ${v.kind}`])),
@@ -262,5 +271,42 @@ export class Studio {
 
 function resolveFile(f) {
   return path.isAbsolute(f) ? f : path.join(WORKSPACE, f);
+}
+
+// ---------------------------------------------------------------- exportação
+const EXPORTERS = {
+  step: { label: 'STEP (B-rep exato)', ext: ['step', 'stp'], write: (b) => writeSTEP(b.map((x) => x.m.shape), b.map((x) => x.name)) },
+  stl: { label: 'STL (malha)', ext: ['stl'], write: toSTL },
+  '3mf': { label: '3MF (malha com cores)', ext: ['3mf'], write: to3MF },
+  obj: { label: 'OBJ (malha)', ext: ['obj'], write: toOBJ },
+  glb: { label: 'GLB (glTF binário)', ext: ['glb'], write: toGLB },
+};
+const KNOWN_EXT = new Set(['step', 'stp', 'stl', '3mf', 'obj', 'glb', 'svg', 'projetista', 'json']);
+function formatFromExt(file) {
+  const e = path.extname(file).slice(1).toLowerCase();
+  return Object.keys(EXPORTERS).find((k) => EXPORTERS[k].ext.includes(e)) || null;
+}
+/** Caminho final de saída: relativo vai para a pasta de projetos; a extensão casa com o formato. */
+function outputPath(file, ext, base, allowed) {
+  let f = resolveFile(file || `${base}.${ext}`);
+  const cur = path.extname(f).slice(1).toLowerCase();
+  if (!allowed.includes(cur)) f = KNOWN_EXT.has(cur) ? `${f.slice(0, -(cur.length + 1))}.${ext}` : `${f}.${ext}`;
+  return f;
+}
+/** Grava com mensagens claras para os erros comuns do Windows (arquivo aberto, sem permissão). */
+function writeOutput(f, buf) {
+  if (/[<>:"|?*\u0000-\u001f]/.test(path.basename(f))) throw new Error(`Nome de arquivo inválido: "${path.basename(f)}" — o Windows não aceita < > : " | ? *`);
+  try {
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, buf);
+  } catch (e) {
+    const why = { EBUSY: 'o arquivo está aberto em outro programa — feche-o e tente de novo', EPERM: 'sem permissão para gravar nessa pasta (ou o arquivo está aberto/somente leitura)', EACCES: 'sem permissão para gravar nessa pasta', ENOSPC: 'disco cheio', ENAMETOOLONG: 'caminho longo demais' }[e.code];
+    throw new Error(`Não foi possível gravar ${f}: ${why || e.message}`);
+  }
+}
+/** Caminho para baixar pelo navegador (só para arquivos dentro da pasta de projetos). */
+function downloadPath(f) {
+  const rel = path.relative(WORKSPACE, f);
+  return rel.startsWith('..') || path.isAbsolute(rel) ? null : `/files/${rel.split(path.sep).map(encodeURIComponent).join('/')}`;
 }
 const slug = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '_').toLowerCase() || 'modelo';

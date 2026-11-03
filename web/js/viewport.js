@@ -152,6 +152,15 @@ export class Viewport {
       const border = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(1, 1)), new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8 }));
       const grp = new THREE.Group(); grp.add(m, border); grp.rotation.set(...rot);
       grp.userData = { plane: name }; m.userData = { plane: name };
+      // rótulo do plano (sprite sempre de frente para a câmera)
+      const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64;
+      const g = cv.getContext('2d');
+      g.fillStyle = `#${new THREE.Color(color).getHexString()}`; g.font = '600 40px "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(name, 64, 34);
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+      const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+      label.position.set(0.42, 0.42, 0); label.scale.set(0.16, 0.08, 1); label.renderOrder = 15;
+      grp.add(label);
       return grp;
     };
     this.planes = { XY: mk('XY', 0x2b78d4, [0, 0, 0]), XZ: mk('XZ', 0x2f9e44, [Math.PI / 2, 0, 0]), YZ: mk('YZ', 0xd9480f, [0, Math.PI / 2, 0]) };

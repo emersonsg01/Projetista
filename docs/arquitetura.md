@@ -29,6 +29,14 @@ flowchart LR
 - **Servidor MCP** (`src/cli.js mcp`): se `/api/info` responde na porta, vira uma **ponte**
   (`src/mcp/bridge.js`) para o app aberto. Senão, cria o próprio `Studio` e hub, e renderiza por software
   (`src/render/raster.js`).
+- **Passagem de controle do kernel**: `/api/info` informa o dono (`owner: "app"` ou `"mcp"`). Se o app
+  desktop abre e encontra um kernel do MCP na porta, ele chama `POST /api/handover`. O kernel do MCP devolve o
+  documento, libera a porta e passa a operar como ponte. O app grava o documento recebido como salvamento
+  automático e sobe o próprio kernel. Se o app fechar, a ponte cai e o MCP retoma o kernel com o documento
+  salvo pelo app (`tests/handover.mjs`). Um kernel de versão antiga, sem essa passagem, faz o app subir o
+  próprio kernel na próxima porta livre.
+- **Transações órfãs**: se a janela que abriu um comando (transação) se desconecta, o hub conclui a transação
+  para o documento não ficar preso em modo de edição.
 - **Workers** (`src/parallel/`): cada um carrega o OpenCascade em modo de uma thread e regenera variantes do
   documento (estudos e otimização). São encerrados após 60 s ociosos.
 
@@ -100,6 +108,7 @@ aresta (ou no centróide da face) e grava `near`.
 | hub → todos | `{ type: "scene", version, bodies[], sketches[] }` | malha (`positions`, `indices`), `faceIds` por triângulo, arestas exatas (`edges`, `edgeIds` por segmento) |
 | hub → todos | `{ type: "state", state }` | parâmetros, linha do tempo e status, corpos, desfazer/refazer, transação, materiais |
 | hub → todos | `{ type: "activity", activity }` | ação registrada (`source`: `ui`, `claude`, `api`) |
+| HTTP | `GET /api/info` · `POST /api/handover` · `POST /api/upload?name=` · `GET /files/<caminho>[?download]` | dono do kernel, passagem de controle, importação e download de arquivos da pasta de projetos |
 | cliente → hub | `{ type: "register", role: "gpu-renderer", desktop }` | a janela se oferece para renderizar (a do app desktop tem prioridade) |
 | hub → cliente | `{ type: "render-request", id, version, opts }` | pedido de imagem para o Claude |
 | cliente → hub | `{ type: "render-result", id, ok, image, width, height, views, gpu }` | PNG renderizado na GPU |

@@ -101,6 +101,7 @@ export const ICONS = {
   stepFile: S('<path d="M5 3h10l4 4v14H5z"/><text x="7" y="17" font-size="6" fill="currentColor" stroke="none" font-weight="700">STP</text>'),
   stlFile: S('<path d="M5 3h10l4 4v14H5z"/><text x="7" y="17" font-size="6" fill="currentColor" stroke="none" font-weight="700">STL</text>'),
   mfFile: S('<path d="M5 3h10l4 4v14H5z"/><text x="7" y="17" font-size="6" fill="currentColor" stroke="none" font-weight="700">3MF</text>'),
+  objFile: S('<path d="M5 3h10l4 4v14H5z"/><text x="7" y="17" font-size="6" fill="currentColor" stroke="none" font-weight="700">OBJ</text>'),
   glbFile: S('<path d="M5 3h10l4 4v14H5z"/><text x="7" y="17" font-size="6" fill="currentColor" stroke="none" font-weight="700">GLB</text>'),
   measure: S('<path d="M3 16 16 3l5 5L8 21z"/><path class="a" d="M7 12l2 2M10 9l2 2M13 6l2 2"/>'),
   iprops: S('<path d="M5 20h14l-2-11H7z"/><circle class="a" cx="12" cy="6" r="2.5"/>'),

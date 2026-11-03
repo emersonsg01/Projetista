@@ -163,7 +163,7 @@ class Panel {
     app.vp.hoverFilter = f ? f.filter : null;
     if (f) app.vp.hoverFilter = { ...f.filter, accept: (hit) => !f.accept || f.accept(hit, this.spec, this) };
     if (f?.showOrigin) app.vp.showOrigin(true);
-    setPrompt(f?.prompt || c.prompt || c.label);
+    setPrompt(f?.prompt || c.prompt || c.label, true);
     this.syncSelection();
   }
   async handleClick(e) {

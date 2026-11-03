@@ -2,7 +2,7 @@
 
 # Referência do servidor MCP
 
-Servidor `projetista` versão 1.0.0. Transporte: stdio. 19 ferramentas, 1 prompt(s), 1 recurso(s).
+Servidor `projetista` versão 1.1.0. Transporte: stdio. 19 ferramentas, 1 prompt(s), 1 recurso(s).
 
 Como configurar o Claude: veja [manual-do-usuario.md](manual-do-usuario.md#13-claude-e-o-servidor-mcp).
 
