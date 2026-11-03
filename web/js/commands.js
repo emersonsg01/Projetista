@@ -1,7 +1,7 @@
 // Registro de comandos (faixa de opções, busca, menu radial, atalhos) e os painéis de
 // propriedades de cada feature.
 import { rpc } from './rpc.js';
-import { app, bodyNames, sketchNames, edgesOf, facesOf, r6 } from './store.js';
+import { app, bodyNames, sketchNames, edgesOf, facesOf, r6, saveSettings } from './store.js';
 import { openPanel, activePanel } from './panel.js';
 import { toast } from './ui.js';
 import * as D from './dialogs.js';
@@ -483,6 +483,7 @@ simple('finishSketch', 'Concluir esboço', 'finish', () => SK.finish(), { key: '
 simple('cancelSketch', 'Cancelar esboço', 'cancel', () => SK.cancel());
 for (const [id, label, ic, key] of [['line', 'Linha', 'line', 'L'], ['circle', 'Círculo', 'circle', 'C'], ['arc', 'Arco (3 pontos)', 'arc', 'A'], ['rect', 'Retângulo', 'rect', 'T'], ['rectCenter', 'Retângulo pelo centro', 'rectCenter'], ['polygon', 'Polígono', 'polygon'], ['slot', 'Rasgo', 'slot'], ['sketchPoint', 'Ponto', 'sketchPoint']]) simple(`sk_${id}`, label, ic, () => SK.tool(id), { key, sketch: true });
 simple('sk_dimension', 'Cota', 'dimension', () => SK.tool('dimension'), { key: 'D', sketch: true });
+simple('sk_autoDims', 'Cotas automáticas', 'dimension', () => { SK.toggleAutoDims(); saveSettings(); }, { sketch: true });
 simple('sk_construction', 'Construção', 'construction', () => SK.toggleConstruction(), { sketch: true });
 simple('sk_delete', 'Excluir', 'delete', () => SK.deleteSelection(), { key: 'Delete', sketch: true });
 for (const [id, label] of [['coincident', 'Coincidente'], ['horizontal', 'Horizontal'], ['vertical', 'Vertical'], ['parallel', 'Paralela'], ['perpendicular', 'Perpendicular'], ['tangent', 'Tangente'], ['equal', 'Igual'], ['fix', 'Fixa'], ['concentric', 'Concêntrica'], ['symmetric', 'Simétrica'], ['midpoint', 'Ponto médio']]) simple(`sk_${id}`, label, id, () => SK.constraintTool(id), { sketch: true });
@@ -490,6 +491,7 @@ simple('sk_showConstraints', 'Mostrar restrições', 'eye', () => SK.toggleGlyph
 
 // mapa feature → comando de edição
 export const EDIT_CMD = Object.fromEntries(Object.keys(P).map((k) => [k, k]));
+export const PANELS = P;
 EDIT_CMD.round_edges = 'fillet';
 
 export function runCommand(id) {

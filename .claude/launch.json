@@ -1,6 +1,7 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "projetista", "runtimeExecutable": "node", "runtimeArgs": ["src/cli.js", "app"], "port": 7777 }
+    { "name": "projetista", "runtimeExecutable": "node", "runtimeArgs": ["src/cli.js", "app"], "port": 7777 },
+    { "name": "projetista-test", "runtimeExecutable": "node", "runtimeArgs": ["src/cli.js", "app", "--port=7799", "--home=C:/Users/PC/AppData/Local/Temp/claude/F--codigos-Projetista/1e21ec7a-cdea-4f70-8d26-7978dd135eac/scratchpad/k7799"], "port": 7799 }
   ]
 }

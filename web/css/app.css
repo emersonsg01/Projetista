@@ -130,7 +130,24 @@ body.no-browser #browserPane, body.no-browser #splitter { display: none; }
 #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 3; }
 .dimlabel { position: absolute; left: 0; top: 0; pointer-events: auto; background: #fff; color: #1c4f9c; border: 1px solid #1c4f9c; border-radius: 3px; padding: 0 5px; font: 600 12px "Segoe UI", sans-serif; cursor: text; white-space: nowrap; }
 .glyph { position: absolute; left: 0; top: 0; pointer-events: auto; background: #fff3e6; color: #d9480f; border: 1px solid #f59f00; border-radius: 4px; padding: 0 4px; font: 600 10px "Segoe UI", sans-serif; cursor: pointer; }
-.dimedit { position: absolute; z-index: 6; width: 120px; font: 600 13px "Segoe UI", sans-serif; border: 2px solid var(--accent); }
+.dimlabel:hover { background: #e7f0ff; border-color: var(--accent); }
+.dimlabel.fx { color: #7048e8; border-color: #7048e8; }
+.dimedit { position: absolute; z-index: 6; display: flex; align-items: center; background: #fff; border: 2px solid var(--accent); border-radius: 4px; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+.dimedit-in { width: 110px; border: 0; outline: 0; padding: 3px 6px; font: 600 13px "Segoe UI", sans-serif; background: transparent; color: #1b2430; }
+.dimunit { padding: 0 6px 0 2px; font: 600 12px "Segoe UI", sans-serif; color: #5c6b7d; }
+.dimtype { position: absolute; left: 0; top: 0; z-index: 6; display: flex; flex-direction: column; gap: 4px; padding: 7px 8px; background: #fff; border: 2px solid var(--accent); border-radius: 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, .2); font: 12px "Segoe UI", sans-serif; color: #1b2430; }
+.dimtype label { display: flex; align-items: center; gap: 6px; }
+.dimtype .lbl { width: 78px; color: #5c6b7d; }
+.dimtype .dimedit-in { width: 90px; border: 1px solid #c5cfdb; border-radius: 3px; }
+.dimtype .dimedit-in:focus { border-color: var(--accent); }
+.dimtype .muted { font-size: 11px; color: #7a8796; }
+.dimlive { position: absolute; left: 0; top: 0; z-index: 5; pointer-events: none; padding: 2px 7px; background: rgba(255, 255, 255, .94); border: 1px solid #a9c4ee; border-radius: 4px; font: 12px "Segoe UI", sans-serif; color: #1c4f9c; white-space: nowrap; }
+.dimlive span { color: #7a8796; }
+/* cotas da feature selecionada no modelo 3D */
+.fdim { position: absolute; left: 0; top: 0; pointer-events: auto; background: #fff; color: #0b7285; border: 1px solid #1098ad; border-radius: 3px; padding: 1px 6px; font: 600 12px "Segoe UI", sans-serif; cursor: text; white-space: nowrap; box-shadow: 0 1px 4px rgba(0, 0, 0, .15); }
+.fdim:hover { background: #e3fafc; }
+.fdim i { font-style: normal; font-weight: 400; color: #5c6b7d; margin-right: 4px; }
+.fdim.fx { color: #7048e8; border-color: #7048e8; }
 #toasts { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column-reverse; gap: 6px; pointer-events: none; z-index: 8; align-items: center; }
 .toast { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); padding: 7px 14px; border-radius: 8px; box-shadow: var(--shadow); animation: fade 6.5s forwards; max-width: 620px; }
 .toast.claude { border-left-color: #d97757; }

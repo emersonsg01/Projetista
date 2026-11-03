@@ -1,5 +1,21 @@
 # Histórico de versões
 
+## 1.2.0 — 2026-11-03
+
+### Cotas paramétricas em milímetros
+- Cotas do esboço exibidas com unidade: `45 mm`, `Ø12 mm`, `R5 mm`, `30°`; cotas com expressão mostram o
+  valor resultante (`largura/2 = 25 mm`) em roxo.
+- Um clique no rótulo abre a edição (antes era duplo clique); aceita `40`, `40,5`, `40 mm`, parâmetros e
+  expressões. A geometria se reajusta pelo solver; valores impossíveis ou expressões inválidas voltam ao
+  valor anterior com aviso.
+- Medidas digitadas durante o desenho: depois do primeiro clique de Linha, Retângulo, Retângulo pelo centro,
+  Círculo e Polígono, a medida aparece junto do cursor e digitar um número (ou Tab) abre as caixas
+  Comprimento / Largura × Altura / Diâmetro. Enter cria a geometria exata e já cotada.
+- Cotas automáticas (Cotar › Cotas automáticas, ligado por padrão): geometria nova já sai cotada em mm;
+  cotas que sobre-restringiriam o esboço são omitidas.
+- Cotas no modelo 3D: ao selecionar um recurso no navegador, suas medidas (distância, ângulo, raio,
+  espessura…) aparecem junto do corpo; clique, digite e o modelo regenera.
+
 ## 1.1.0 — 2026-11-03
 
 ### Exportação

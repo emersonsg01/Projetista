@@ -93,6 +93,7 @@ export function tool(kind) { if (S) S.setTool(kind); }
 export function constraintTool(kind) { if (S) S.setTool('constraint', kind); }
 export function toggleConstruction() { if (!S) return; S.construction = !S.construction; S.applyConstructionToSelection(); toast(S.construction ? 'Nova geometria: construção' : 'Nova geometria: normal'); }
 export function deleteSelection() { S?.deleteSelection(); }
+export function toggleAutoDims() { app.settings.autoDims = app.settings.autoDims === false; toast(app.settings.autoDims ? 'Cotas automáticas ligadas: a geometria nova já sai cotada em mm' : 'Cotas automáticas desligadas'); }
 export function toggleGlyphs() { app.settings.showConstraints = !app.settings.showConstraints; S?.redraw(); }
 export const session = () => S;
 
@@ -121,12 +122,24 @@ class Session {
     this.cursor = null;
     app.vp.tool = this.handlers();
     app.vp.onFrame = () => this.placeLabels();
+    this.lastScreen = { x: 0, y: 0 };
+    // depois do primeiro clique, digitar um número (ou Tab) abre as caixas de valor
+    this.onKey = (e) => {
+      if (this.typing || this.editor || e.ctrlKey || e.altKey || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+      if (!this.typingFields() || !(/^[0-9.,]$/.test(e.key) || e.key === 'Tab')) return;
+      e.preventDefault(); e.stopPropagation();
+      this.openTyping(e.key === 'Tab' ? '' : e.key);
+    };
+    window.addEventListener('keydown', this.onKey, true);
   }
   dispose() {
     app.vp.sketchGroup.remove(this.group);
     this.gridObj && app.vp.sketchGroup.remove(this.gridObj);
     this.labelsEl.innerHTML = '';
     this.editor?.remove();
+    this.closeTyping();
+    this.tipEl?.remove();
+    window.removeEventListener('keydown', this.onKey, true);
     app.vp.onFrame = null;
   }
   uid(prefix) { let i = 1; const used = new Set([...Object.keys(this.points), ...this.entities.map((e) => e.id)]); while (used.has(`${prefix}${i}`)) i++; return `${prefix}${i}`; }
@@ -237,12 +250,11 @@ class Session {
     };
     for (const [i, c] of this.constraints.entries()) {
       let anchor = null, text = null, cls = 'dimlabel';
-      const val = c.value;
-      const show = (v) => (typeof v === 'number' ? (+v.toFixed(3)).toString().replace('.', ',') : String(v));
-      if (c.type === 'length') { const e = ent.get(c.line); if (!e) continue; anchor = mid(P[e.a], P[e.b], 1, e); text = show(val); }
-      else if (c.type === 'distance' || c.type === 'distanceX' || c.type === 'distanceY') { if (!P[c.p] || !P[c.q]) continue; anchor = mid(P[c.p], P[c.q], 0); text = (c.type === 'distanceX' ? '↔ ' : c.type === 'distanceY' ? '↕ ' : '') + show(val); }
-      else if (c.type === 'radius' || c.type === 'diameter') { const e = ent.get(c.circle); if (!e) continue; const ctr = P[e.c], r = this.radiusOf(e); anchor = [ctr[0] + r * 0.72, ctr[1] + r * 0.72]; text = `${c.type === 'radius' ? 'R' : 'Ø'}${show(val)}`; }
-      else if (c.type === 'angle') { const a = ent.get(c.l1), b = ent.get(c.l2); if (!a || !b) continue; anchor = mid(mid(P[a.a], P[a.b], 0), mid(P[b.a], P[b.b], 0), 0); text = `${show(val)}°`; }
+      const show = () => dimText(c, this.measure(c));
+      if (c.type === 'length') { const e = ent.get(c.line); if (!e) continue; anchor = mid(P[e.a], P[e.b], 2, e); text = show(); }
+      else if (c.type === 'distance' || c.type === 'distanceX' || c.type === 'distanceY') { if (!P[c.p] || !P[c.q]) continue; anchor = mid(P[c.p], P[c.q], 0); text = (c.type === 'distanceX' ? '↔ ' : c.type === 'distanceY' ? '↕ ' : '') + show(); }
+      else if (c.type === 'radius' || c.type === 'diameter') { const e = ent.get(c.circle); if (!e) continue; const ctr = P[e.c], r = this.radiusOf(e); anchor = [ctr[0] + r * 0.72, ctr[1] + r * 0.72]; text = show(); }
+      else if (c.type === 'angle') { const a = ent.get(c.l1), b = ent.get(c.l2); if (!a || !b) continue; anchor = mid(mid(P[a.a], P[a.b], 0), mid(P[b.a], P[b.b], 0), 0); text = show(); }
       else if (app.settings.showConstraints && GLYPH[c.type] && c.p !== 'O') {
         cls = 'glyph';
         const e = ent.get(c.line || c.l1 || c.circle || c.c1);
@@ -252,8 +264,11 @@ class Session {
         text = GLYPH[c.type];
       }
       if (!anchor) continue;
-      const el = h('div', { class: cls, title: cls === 'glyph' ? c.type : 'Duplo clique para editar' }, text);
-      if (cls === 'dimlabel') el.addEventListener('dblclick', (ev) => { ev.stopPropagation(); this.editDimension(i); });
+      const el = h('div', { class: cls + (cls === 'dimlabel' && typeof c.value === 'string' ? ' fx' : ''), title: cls === 'glyph' ? c.type : 'Clique para digitar o valor em mm (aceita parâmetros e expressões, ex.: largura/2)' }, text);
+      if (cls === 'dimlabel') {
+        el.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+        el.addEventListener('click', (ev) => { ev.stopPropagation(); this.editDimension(i); });
+      }
       if (cls === 'glyph') el.addEventListener('click', (ev) => { ev.stopPropagation(); this.sel.clear(); this.selConstraint = i; this.redraw(); setPrompt(`Restrição ${c.type} selecionada — Delete remove`); });
       this.labelsEl.append(el);
       this.labels.push({ el, anchor, ci: i });
@@ -267,27 +282,68 @@ class Session {
       l.el.style.transform = `translate(${s.x}px, ${s.y}px) translate(-50%, -50%)`;
     }
   }
-  editDimension(i) {
+  /** Valor atual da cota medido na geometria resolvida (mostrado ao lado de expressões). */
+  measure(c) {
+    const P = this.points, ent = (id) => this.entities.find((e) => e.id === id);
+    const d = (a, b) => (a && b ? [b[0] - a[0], b[1] - a[1]] : [0, 0]);
+    switch (c.type) {
+      case 'length': { const e = ent(c.line); return e ? Math.hypot(...d(P[e.a], P[e.b])) : 0; }
+      case 'distance': return Math.hypot(...d(P[c.p], P[c.q]));
+      case 'distanceX': return Math.abs(d(P[c.p], P[c.q])[0]);
+      case 'distanceY': return Math.abs(d(P[c.p], P[c.q])[1]);
+      case 'radius': case 'diameter': { const e = ent(c.circle); return e ? this.radiusOf(e) * (c.type === 'diameter' ? 2 : 1) : 0; }
+      case 'angle': {
+        const a = ent(c.l1), b = ent(c.l2);
+        if (!a || !b) return 0;
+        const d1 = dirOf(P, a), d2 = dirOf(P, b);
+        return Math.abs((Math.atan2(d1[0] * d2[1] - d1[1] * d2[0], d1[0] * d2[0] + d1[1] * d2[1]) * 180) / Math.PI);
+      }
+      default: return 0;
+    }
+  }
+  /**
+   * Caixa de edição de uma cota. Aceita número em mm ("40", "40,5", "40 mm"), parâmetro
+   * ou expressão ("largura/2"); o solver reajusta a geometria. `chain` lista cotas para
+   * percorrer com Tab (ex.: largura → altura de um retângulo recém-desenhado).
+   */
+  editDimension(i, chain = null) {
     const c = this.constraints[i];
+    if (!c) return;
+    this.editor?.blur();
     this.editor?.remove();
     const anchorEl = this.labels.find((l) => l.ci === i)?.el;
-    const inp = h('input', { class: 'dimedit', value: typeof c.value === 'number' ? +c.value.toFixed(6) : c.value });
+    const unit = c.type === 'angle' ? '°' : 'mm';
+    const inp = h('input', { class: 'dimedit-in', value: typeof c.value === 'number' ? fmtNum(c.value, 6) : c.value, spellcheck: false });
+    const box = h('div', { class: 'dimedit' }, inp, h('span', { class: 'dimunit' }, unit));
     const r = anchorEl?.getBoundingClientRect(), vr = app.vp.el.getBoundingClientRect();
-    inp.style.left = `${(r ? r.left - vr.left : vr.width / 2) - 10}px`;
-    inp.style.top = `${(r ? r.top - vr.top : vr.height / 2) - 4}px`;
-    app.vp.el.append(inp);
+    box.style.left = `${(r ? r.left - vr.left : vr.width / 2) - 10}px`;
+    box.style.top = `${(r ? r.top - vr.top : vr.height / 2) - 4}px`;
+    app.vp.el.append(box);
     this.editor = inp;
     setTimeout(() => { inp.focus(); inp.select(); }, 10);
-    const done = (apply) => {
-      if (!this.editor) return;
-      this.editor = null; inp.remove();
-      if (!apply) return;
-      const t = inp.value.trim().replace(',', '.');
-      if (!t) return;
-      c.value = !isNaN(+t) ? +t : inp.value.trim();
-      this.commit();
+    let closed = false;
+    const done = (apply, next) => {
+      if (closed) return;
+      closed = true;
+      if (this.editor === inp) this.editor = null;
+      box.remove();
+      const v = apply ? parseDim(inp.value) : null;
+      if (v !== null && v !== c.value) {
+        const old = c.value;
+        c.value = v;
+        this.commit({ revert: () => { c.value = old; } });
+      }
+      if (next !== undefined && chain?.length) {
+        const k = chain.indexOf(i), j = chain[(k + next + chain.length) % chain.length];
+        this.chain.then(() => this.editDimension(j, chain));
+      }
     };
-    inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); });
+    inp.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') done(true);
+      else if (e.key === 'Escape') done(false);
+      else if (e.key === 'Tab' && chain?.length > 1) { e.preventDefault(); done(true, e.shiftKey ? -1 : 1); }
+    });
     inp.addEventListener('blur', () => done(true));
   }
 
@@ -297,15 +353,29 @@ class Session {
     this.chain = this.chain.then(async () => {
       const prev = this.info;
       const pts = Object.fromEntries(Object.entries(this.points).map(([k, p]) => [k, [+p[0].toFixed(9), +p[1].toFixed(9)]]));
-      await rpc('update_feature', { name: this.name, patch: { points: pts, entities: this.entities, constraints: this.constraints } });
-      const info = await rpc('sketch_info', { name: this.name });
-      if (opts.guard && (info.redundant > prev.redundant || (prev.residual < 1e-6 && info.residual > 1e-6))) {
+      let info;
+      try {
+        await rpc('update_feature', { name: this.name, patch: { points: pts, entities: this.entities, constraints: this.constraints } });
+        info = await rpc('sketch_info', { name: this.name });
+      } catch (e) {
+        if (!opts.revert) throw e;
+        info = { status: 'conflito', error: e.message };
+      }
+      const broke = info.redundant > prev.redundant || (prev.residual < 1e-6 && info.residual > 1e-6) || (info.status === 'conflito' && prev.status !== 'conflito');
+      if (opts.guard && broke) {
         // a nova restrição conflita: desfaz como no Inventor ("sobre-restringiria o esboço")
-        this.constraints.pop();
-        toast('Essa restrição sobre-restringe o esboço e não foi adicionada.', 'warn');
+        this.constraints.splice(this.constraints.length - (+opts.guard || 1));
+        if (!opts.quiet) toast('Essa restrição sobre-restringe o esboço e não foi adicionada.', 'warn');
         await rpc('update_feature', { name: this.name, patch: { constraints: this.constraints } });
         this.apply(await rpc('sketch_info', { name: this.name }));
         return;
+      }
+      if (opts.revert && broke) {
+        // valor impossível (ou expressão inválida): volta ao anterior
+        opts.revert();
+        toast(info.error ? 'Valor inválido — confira o nome do parâmetro ou a expressão. O valor anterior foi mantido.' : 'Esse valor não é possível com as outras restrições do esboço — valor anterior mantido.', 'warn');
+        await rpc('update_feature', { name: this.name, patch: { constraints: this.constraints } });
+        info = await rpc('sketch_info', { name: this.name });
       }
       this.apply(info);
     }).catch((e) => toast(e.message, 'err'));
@@ -396,11 +466,13 @@ class Session {
       sketchPoint: 'Ponto: clique para posicionar', dimension: 'Cota: clique numa linha, círculo, arco ou em dois pontos',
       constraint: `Restrição ${sub}: selecione a geometria`,
     };
-    this.toolPrompt = prompts[kind];
+    this.toolPrompt = this.basePrompt = prompts[kind];
     if (kind === 'polygon') ask({ title: 'Polígono', label: 'Número de lados', value: this.polySides || 6 }).then((v) => { if (v) this.polySides = Math.max(3, Math.min(64, parseInt(v, 10) || 6)); });
     this.status();
   }
   cancelTool() {
+    this.closeTyping?.();
+    this.tipEl?.remove(); this.tipEl = null;
     this.toolState = null;
     this.toolPrompt = null;
     this.preview = null;
@@ -423,8 +495,13 @@ class Session {
         const from = t.picks.length ? t.picks.at(-1).uv : null;
         const s = this.snap(ev, t.kind === 'line' || t.kind === 'rect' ? from : null);
         if (!s) return true;
+        if (this.typing) return true; // valores sendo digitados: a pré-visualização fica parada
+        const vr = app.vp.el.getBoundingClientRect();
+        this.lastSnap = s;
+        this.lastScreen = { x: ev.clientX - vr.left, y: ev.clientY - vr.top };
         this.setCursor(s, s.snapped);
         this.previewTool(s);
+        this.liveTip([s.u, s.v]);
         return true;
       },
       pointerdown: (ev) => {
@@ -490,11 +567,30 @@ class Session {
     const from = t.picks.length ? t.picks.at(-1).uv : null;
     const s = this.snap(ev, t.kind === 'line' || t.kind === 'rect' ? from : null);
     if (!s) return;
+    return this.place(s);
+  }
+
+  /**
+   * Coloca o próximo ponto da ferramenta ativa. A geometria nova recebe cotas
+   * paramétricas (mm) com o tamanho desenhado — ou com o valor digitado em `typed`
+   * ({ length, width, height, diameter }, número ou expressão) — e um clique na cota
+   * permite trocar o valor depois.
+   */
+  async place(s, typed = null) {
+    const t = this.toolState;
+    this.closeTyping();
+    this.liveTip(null);
     t.picks.push({ uv: [s.u, s.v], s });
+    this.updateToolPrompt();
+    this.status();
     const P = t.picks;
     const cons = this.construction;
     const add = (e) => { this.entities.push({ construction: cons || undefined, ...e }); return e.id; };
     const C = (c) => this.constraints.push(c);
+    const dims = [];
+    const auto = typed || (app.settings.autoDims !== false && !cons);
+    const D = (c, v) => { if (auto) { this.constraints.push({ ...c, value: v ?? null }); dims.push(this.constraints.length - 1); } };
+    const r3 = (x) => +x.toFixed(3);
     switch (t.kind) {
       case 'sketchPoint': { const p = this.getPoint(s); add({ id: this.uid('pt'), type: 'point', p }); t.picks = []; break; }
       case 'line': {
@@ -503,6 +599,7 @@ class Session {
         if (a === b) { P.pop(); return; }
         const id = add({ id: this.uid('l'), type: 'line', a, b });
         if (s.hv) C({ type: s.hv, line: id });
+        D({ type: 'length', line: id }, typed?.length ?? r3(Math.hypot(P[1].uv[0] - P[0].uv[0], P[1].uv[1] - P[0].uv[1])));
         const closed = !!s.pointId;
         t.picks = closed ? [] : [{ uv: [s.u, s.v], id: b }];
         if (closed) this.setPreview(null);
@@ -512,7 +609,8 @@ class Session {
         if (P.length < 2) { P[0].id = this.getPoint(s); return; }
         const c = P[0].id, r = Math.hypot(P[1].uv[0] - P[0].uv[0], P[1].uv[1] - P[0].uv[1]);
         if (r < 1e-9) { P.pop(); return; }
-        add({ id: this.uid('c'), type: 'circle', c, r });
+        const id = add({ id: this.uid('c'), type: 'circle', c, r });
+        D({ type: 'diameter', circle: id }, typed?.diameter ?? r3(2 * r));
         t.picks = []; break;
       }
       case 'arc': {
@@ -521,7 +619,8 @@ class Session {
         if (!a3) { t.picks = []; break; }
         const pa = this.getPoint(P[0].s), pb = this.getPoint(P[1].s);
         const pc = this.uid('p'); this.points[pc] = a3.c;
-        add({ id: this.uid('a'), type: 'arc', c: pc, a: a3.ccw ? pa : pb, b: a3.ccw ? pb : pa });
+        const id = add({ id: this.uid('a'), type: 'arc', c: pc, a: a3.ccw ? pa : pb, b: a3.ccw ? pb : pa });
+        D({ type: 'radius', circle: id }, r3(Math.hypot(P[0].uv[0] - a3.c[0], P[0].uv[1] - a3.c[1])));
         t.picks = []; break;
       }
       case 'rect': case 'rectCenter': {
@@ -535,6 +634,8 @@ class Session {
         const L = [0, 1, 2, 3].map((i) => add({ id: this.uid('l'), type: 'line', a: ids[i], b: ids[(i + 1) % 4] }));
         C({ type: 'horizontal', line: L[0] }); C({ type: 'horizontal', line: L[2] }); C({ type: 'vertical', line: L[1] }); C({ type: 'vertical', line: L[3] });
         if (center) { const pc = this.getPoint(P[0].s); C({ type: 'midpoint', p: pc, a: ids[0], b: ids[2] }); }
+        D({ type: 'length', line: L[0] }, typed?.width ?? r3(Math.abs(c3[0] - c1[0])));
+        D({ type: 'length', line: L[1] }, typed?.height ?? r3(Math.abs(c3[1] - c1[1])));
         t.picks = []; break;
       }
       case 'polygon': {
@@ -547,6 +648,7 @@ class Session {
         const L = ids.map((id, i) => add({ id: this.uid('l'), type: 'line', a: id, b: ids[(i + 1) % n] }));
         ids.forEach((id) => C({ type: 'pointOnCircle', p: id, circle: circ }));
         for (let i = 1; i < n; i++) C({ type: 'equal', l1: L[0], l2: L[i] });
+        D({ type: 'diameter', circle: circ }, typed?.diameter ?? r3(2 * r));
         t.picks = []; break;
       }
       case 'slot': {
@@ -560,12 +662,95 @@ class Session {
         const l1 = add({ id: this.uid('l'), type: 'line', a: pa, b: pb }), l2 = add({ id: this.uid('l'), type: 'line', a: pcc, b: pd });
         const a1 = add({ id: this.uid('a'), type: 'arc', c: c2, a: pb, b: pcc }), a2 = add({ id: this.uid('a'), type: 'arc', c: c1, a: pd, b: pa });
         C({ type: 'tangent', line: l1, circle: a1 }); C({ type: 'tangent', line: l1, circle: a2 }); C({ type: 'tangent', line: l2, circle: a1 }); C({ type: 'equal', l1: a1, l2: a2 });
+        D({ type: 'distance', p: c1, q: c2 }, r3(l));
+        D({ type: 'radius', circle: a1 }, r3(w));
         t.picks = []; break;
       }
       default: break;
     }
     if (!t.picks.length) this.setPreview(null);
-    await this.commit();
+    this.updateToolPrompt();
+    await this.commit(dims.length ? { guard: dims.length, quiet: true } : {});
+  }
+
+  // ---------------------------------------------------------- valores digitados durante o desenho
+  /** Campos que podem ser digitados depois do primeiro clique de cada ferramenta. */
+  typingFields() {
+    const t = this.toolState;
+    if (!t || t.picks.length !== 1) return null;
+    return { line: [['length', 'Comprimento']], rect: [['width', 'Largura'], ['height', 'Altura']], rectCenter: [['width', 'Largura'], ['height', 'Altura']], circle: [['diameter', 'Diâmetro']], polygon: [['diameter', 'Diâmetro']] }[t.kind] || null;
+  }
+  /** Medidas da pré-visualização atual (o que a ferramenta criaria no ponto do cursor). */
+  previewSizes(q) {
+    const t = this.toolState, p = t.picks[0].uv, du = q[0] - p[0], dv = q[1] - p[1];
+    switch (t.kind) {
+      case 'line': return { length: Math.hypot(du, dv) };
+      case 'rect': return { width: Math.abs(du), height: Math.abs(dv) };
+      case 'rectCenter': return { width: 2 * Math.abs(du), height: 2 * Math.abs(dv) };
+      case 'circle': case 'polygon': return { diameter: 2 * Math.hypot(du, dv) };
+      default: return {};
+    }
+  }
+  liveTip(q) {
+    const f = this.typingFields();
+    if (!f || !q || this.typing) { this.tipEl?.remove(); this.tipEl = null; return; }
+    const sz = this.previewSizes(q);
+    const txt = f.map(([k]) => `${k === 'diameter' ? 'Ø' : ''}${fmtNum(sz[k], 2)} mm`).join(' × ');
+    if (!this.tipEl) { this.tipEl = h('div', { class: 'dimlive' }); app.vp.el.append(this.tipEl); }
+    this.tipEl.innerHTML = '';
+    this.tipEl.append(h('b', {}, txt), h('span', {}, ' — digite o valor'));
+    this.tipEl.style.transform = `translate(${this.lastScreen.x + 16}px, ${this.lastScreen.y + 18}px)`;
+  }
+  /** Abre as caixas de valor (Tab alterna, Enter cria a geometria com as medidas exatas). */
+  openTyping(first = '') {
+    const f = this.typingFields(), t = this.toolState;
+    if (!f || !this.lastSnap) return;
+    this.closeTyping();
+    this.liveTip(null);
+    const sz = this.previewSizes([this.lastSnap.u, this.lastSnap.v]);
+    const inputs = f.map(([k, label], i) => {
+      const inp = h('input', { class: 'dimedit-in', value: i === 0 && first ? first : fmtNum(sz[k], 3), spellcheck: false, 'data-key': k });
+      return { k, inp, row: h('label', {}, h('span', { class: 'lbl' }, label), inp, h('span', { class: 'dimunit' }, 'mm')) };
+    });
+    const box = h('div', { class: 'dimtype' }, ...inputs.map((x) => x.row), h('div', { class: 'muted' }, f.length > 1 ? 'Tab alterna · Enter cria · Esc cancela' : 'Enter cria · Esc cancela'));
+    box.style.transform = `translate(${this.lastScreen.x + 16}px, ${this.lastScreen.y + 18}px)`;
+    app.vp.el.append(box);
+    this.typing = box;
+    const inp0 = inputs[0].inp;
+    setTimeout(() => { inp0.focus(); if (first) inp0.setSelectionRange(first.length, first.length); else inp0.select(); }, 0);
+    const submit = () => {
+      const vals = {};
+      for (const { k, inp } of inputs) { const v = parseDim(inp.value); if (v === null) { inp.focus(); inp.select(); toast('Digite um valor em mm, um parâmetro ou uma expressão.', 'warn'); return; } vals[k] = v; }
+      // posição: as medidas digitadas na direção em que o cursor está
+      const p = t.picks[0].uv, q = [this.lastSnap.u, this.lastSnap.v];
+      const num = (k) => (typeof vals[k] === 'number' ? vals[k] : sz[k]) || 1;
+      const sgn = (x) => (x < 0 ? -1 : 1);
+      let u, v;
+      if (t.kind === 'rect' || t.kind === 'rectCenter') {
+        const k = t.kind === 'rect' ? 1 : 0.5;
+        u = p[0] + sgn(q[0] - p[0]) * num('width') * k; v = p[1] + sgn(q[1] - p[1]) * num('height') * k;
+      } else {
+        const L = t.kind === 'line' ? num('length') : num('diameter') / 2;
+        let d = [q[0] - p[0], q[1] - p[1]];
+        const n = Math.hypot(...d);
+        d = n > 1e-9 ? [d[0] / n, d[1] / n] : [1, 0];
+        u = p[0] + d[0] * L; v = p[1] + d[1] * L;
+      }
+      this.place({ u, v, hv: t.kind === 'line' ? this.lastSnap.hv : null }, vals);
+    };
+    for (const [i, { inp }] of inputs.entries()) {
+      inp.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') { e.preventDefault(); submit(); }
+        else if (e.key === 'Escape') { e.preventDefault(); this.closeTyping(); }
+        else if (e.key === 'Tab') { e.preventDefault(); const j = (i + (e.shiftKey ? -1 : 1) + inputs.length) % inputs.length; inputs[j].inp.focus(); inputs[j].inp.select(); }
+      });
+    }
+  }
+  closeTyping() { this.typing?.remove(); this.typing = null; }
+  updateToolPrompt() {
+    const f = this.typingFields();
+    this.toolPrompt = f ? `${f.map(([, l]) => l).join(' / ')}: clique no próximo ponto ou digite o valor em mm (Tab alterna)` : this.basePrompt;
   }
 
   async dimensionClick(ev) {
@@ -703,6 +888,23 @@ function onArc(q, c, a, b) {
   if (t1 <= t0) t1 += 2 * Math.PI;
   if (t < t0) t += 2 * Math.PI;
   return t <= t1;
+}
+/** Número no formato brasileiro, sem zeros à direita: 40, 40,5, 12,375. */
+export function fmtNum(v, digits = 3) { return Number.isFinite(+v) ? (+(+v).toFixed(digits)).toString().replace('.', ',') : String(v); }
+/** Texto de uma cota: "40 mm", "Ø12 mm", "R5 mm", "30°"; com expressão: "largura/2 = 20 mm". */
+function dimText(c, measured) {
+  const unit = c.type === 'angle' ? '°' : ' mm';
+  const pre = c.type === 'radius' ? 'R' : c.type === 'diameter' ? 'Ø' : '';
+  if (typeof c.value === 'number') return `${pre}${fmtNum(c.value)}${unit}`;
+  return `${pre}${c.value} = ${fmtNum(measured, 2)}${unit}`;
+}
+/** Lê o que foi digitado numa cota: "40", "40,5", "40 mm", "30°" → número; outro texto → expressão. */
+export function parseDim(text) {
+  const t = String(text ?? '').trim().replace(/\s*(mm|°|graus?)$/i, '').trim();
+  if (!t) return null;
+  const n = t.replace(',', '.');
+  if (/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(n)) return +n;
+  return t.replace(/(\d),(\d)/g, '$1.$2');
 }
 function dirOf(P, e) { const a = P[e.a], b = P[e.b], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; }
 function circlePts(c, r, n = 64) { return Array.from({ length: n + 1 }, (_, i) => [c[0] + r * Math.cos((2 * Math.PI * i) / n), c[1] + r * Math.sin((2 * Math.PI * i) / n)]); }

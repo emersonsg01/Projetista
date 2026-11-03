@@ -12,7 +12,7 @@ const col = (...ids) => ({ kind: 'col', ids });
 export const TABS = [
   { id: 'sketch', label: 'Esboço', contextual: true, panels: [
     { title: 'Desenhar', items: [big('sk_line'), col('sk_circle', 'sk_arc', 'sk_rect'), col('sk_rectCenter', 'sk_polygon', 'sk_slot'), col('sk_sketchPoint', 'sk_construction', 'sk_delete')] },
-    { title: 'Cotar', items: [big('sk_dimension')] },
+    { title: 'Cotar', items: [big('sk_dimension'), col('sk_autoDims')] },
     { title: 'Restringir', items: [col('sk_coincident', 'sk_horizontal', 'sk_vertical'), col('sk_parallel', 'sk_perpendicular', 'sk_tangent'), col('sk_equal', 'sk_concentric', 'sk_fix'), col('sk_symmetric', 'sk_midpoint', 'sk_showConstraints')] },
     { title: 'Concluir', items: [big('finishSketch'), big('cancelSketch')] },
   ] },
@@ -107,7 +107,8 @@ export const DESC = {
   options: 'Tema, qualidade de exibição, grade do esboço e exportação.',
   resources: 'Uso de CPU, RAM, workers e GPU.',
   sk_line: 'Linhas em sequência. Clique no ponto inicial para fechar o contorno.',
-  sk_dimension: 'Cota comprimentos, distâncias, diâmetros, raios e ângulos. Aceita expressões.',
+  sk_dimension: 'Cota comprimentos, distâncias, diâmetros, raios e ângulos em mm. Clique numa cota para digitar outro valor: a geometria se ajusta. Aceita parâmetros e expressões.',
+  sk_autoDims: 'Liga/desliga as cotas automáticas: linhas, retângulos e círculos novos já saem cotados em mm. Depois do primeiro clique, digite um número para dar a medida exata.',
   finishSketch: 'Sai do esboço mantendo o que foi desenhado.',
   cancelSketch: 'Sai do esboço descartando as alterações desta sessão.',
   claude: 'Mostra como ligar o Claude a este app pelo MCP.',
@@ -119,7 +120,7 @@ const ACTIVE = {
   zebra: () => app.vp.style === 'zebra', curvature: () => app.vp.style === 'curvature', draftAnalysis: () => app.vp.style === 'draft',
   ortho: () => app.settings.projection === 'ortho', persp: () => app.settings.projection !== 'ortho', origin: () => app.originPinned,
   toggleSketches: () => app.settings.showSketches, toggleBrowser: () => !document.body.classList.contains('no-browser'),
-  sk_construction: () => !!app.sketching?.construction, sk_showConstraints: () => app.settings.showConstraints,
+  sk_construction: () => !!app.sketching?.construction, sk_showConstraints: () => app.settings.showConstraints, sk_autoDims: () => app.settings.autoDims !== false,
 };
 
 let activeTab = 'model';

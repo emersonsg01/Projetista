@@ -141,6 +141,7 @@ export class Viewport {
     this.navcube.render();
     this.renderTriad();
     this.onFrame?.();
+    this.onFrameDims?.();
   }
 
   // ---------------------------------------------------------------- origem e tríade

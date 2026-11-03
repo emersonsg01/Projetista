@@ -98,12 +98,13 @@ Exemplo: uma placa de 80 × 40 × 10 mm com quatro furos M5 escareados e cantos 
 
 1. **Parâmetros.** Abra **Gerenciar › Parâmetros** (Ctrl+Shift+P) e crie `L = 80`, `W = L/2` e `esp = 10`.
 2. **Esboço.** Clique em **Iniciar esboço 2D** (S) e escolha o plano **XY**.
-3. **Retângulo.** Use a ferramenta **Retângulo** (T): clique num canto e depois no canto oposto.
-4. **Cotas.** Ative **Cota** (D), clique na aresta horizontal e digite `L`. Clique na aresta vertical e
-   digite `W`.
-5. **Posição.** Com a cota ainda ativa, clique no canto inferior esquerdo do retângulo e depois no ponto
-   amarelo de origem. Digite `0` nas cotas criadas, ou use a restrição **Coincidente**. O status mostra
-   **Esboço totalmente restrito**.
+3. **Retângulo.** Use a ferramenta **Retângulo** (T) e clique no ponto amarelo de origem. Em vez de clicar
+   no canto oposto, pressione **Tab** (abre as caixas de valor), digite `L`, pressione **Tab**, digite `W` e
+   pressione **Enter**: o retângulo é criado já cotado com as medidas exatas.
+4. **Conferir as cotas.** As cotas aparecem em mm (`L = 80 mm`, `W = 40 mm`). Para mudar uma delas, clique
+   no rótulo, digite outro valor e pressione Enter. O status mostra **Esboço totalmente restrito**.
+5. **Posição.** Se o primeiro canto não ficou na origem, ative **Cota** (D), clique no canto e depois no
+   ponto amarelo de origem e digite `0`, ou use a restrição **Coincidente**.
 6. **Concluir.** Clique em **Concluir esboço** (Ctrl+Enter).
 7. **Extrusão.** Clique em **Extrusão** (E). O perfil já vem selecionado. Em **Distância A**, digite `esp`
    e clique em **OK**.
@@ -143,6 +144,19 @@ Mudou de ideia? Altere `L` no diálogo de Parâmetros: tudo regenera, incluindo 
 | **Construção** | Alterna geometria de construção (tracejada, não forma perfil). Também converte a seleção |
 | **Excluir** (Delete) | Exclui a geometria selecionada, as restrições ligadas a ela e os pontos órfãos |
 
+**Medidas digitadas.** Depois do primeiro clique de **Linha**, **Retângulo**, **Retângulo pelo centro**,
+**Círculo** ou **Polígono**, a medida atual aparece junto do cursor (por exemplo `80 mm × 40 mm`). Digite um
+número (ou pressione Tab) para abrir as caixas de valor: **Comprimento**, **Largura / Altura** ou
+**Diâmetro**. Para começar com um parâmetro, pressione Tab primeiro (letras soltas acionam atalhos de
+ferramenta). Tab alterna entre as caixas, Enter cria a geometria com as medidas exatas na direção do cursor
+e Esc volta ao mouse. Aceita parâmetros e expressões.
+
+**Cotas automáticas.** Com **Cotar › Cotas automáticas** ligado (padrão), toda geometria nova já sai cotada
+em mm com o tamanho desenhado: comprimento nas linhas, largura e altura nos retângulos, diâmetro nos
+círculos e polígonos, raio nos arcos, distância entre centros e raio nos rasgos. Cotas que
+sobre-restringiriam o esboço (como a última linha de um contorno fechado) são omitidas. Geometria de
+construção não recebe cotas automáticas.
+
 **Ajustes automáticos.** O cursor encaixa em pontos existentes (marcador laranja) e na grade (Opções ›
 Ajustar à grade). Ao desenhar linhas quase horizontais ou verticais, a restrição correspondente é aplicada
 sozinha e aparece o símbolo **H** ou **V**.
@@ -162,9 +176,21 @@ Ative **Cota** (D) e clique:
 | um círculo | diâmetro (Ø) |
 | um arco | raio (R) |
 
-Depois de criar a cota, digite o valor na caixa e pressione Enter. Aceita números (`25`, `2,5`) e
-**expressões com parâmetros** (`L/2`, `esp*3`, `sqrt(A^2+B^2)`). Para mudar depois, dê duplo clique no rótulo
-da cota.
+As cotas são exibidas em milímetros (`45 mm`, `Ø12 mm`, `R5 mm`) e ângulos em graus (`30°`). Depois de
+criar a cota, digite o valor na caixa e pressione Enter. Aceita números (`25`, `2,5`, `25 mm`) e
+**expressões com parâmetros** (`L/2`, `esp*3`, `sqrt(A^2+B^2)`). Cotas com expressão aparecem em roxo com o
+valor resultante (`L/2 = 40 mm`).
+
+**Mudar uma cota é paramétrico:** clique no rótulo, digite o novo valor e pressione Enter. O solver reajusta
+a geometria e tudo o que depende do esboço (extrusões, furos, desenhos) é regenerado. Se o valor for
+impossível com as outras restrições, ou a expressão citar um parâmetro que não existe, o valor anterior é
+mantido e aparece um aviso.
+
+### Cotas no modelo 3D
+
+Selecione um recurso no navegador do modelo (por exemplo **Extrusão1**) para ver as cotas dele junto do
+corpo: distância, ângulos, raios de filete, espessura de casca. Clique numa cota, digite outro valor ou
+expressão e pressione Enter: o modelo é regenerado na hora. Esc limpa a seleção.
 
 ### Restrições geométricas
 

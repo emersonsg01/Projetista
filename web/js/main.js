@@ -9,6 +9,7 @@ import { activePanel } from './panel.js';
 import * as SK from './sketcher.js';
 import * as D from './dialogs.js';
 import { EXAMPLES } from './examples.js';
+import { initFeatureDims } from './featuredims.js';
 import { h, ico, $, $$, toast, setPrompt, setStatusRight, contextMenu, closeContextMenu, norm, fmt } from './ui.js';
 import { icon } from './icons.js';
 
@@ -21,6 +22,7 @@ if (window.projetista?.desktop) document.body.classList.add('desktop');
 
 // ---------------------------------------------------------------- viewport
 const vp = (app.vp = new Viewport($('#viewport')));
+initFeatureDims(vp);
 vp.idleFilter = { faces: true };
 D.applyTheme(app.settings.theme);
 vp.setStyle(app.settings.style);
@@ -235,7 +237,7 @@ addEventListener('keydown', (e) => {
     if (activePanel()) return activePanel().cancel();
     if (!$('#backstage').classList.contains('hidden')) return $('#backstage').classList.add('hidden');
     if (app.sketching) return SK.finish();
-    app.selectedBody = null; vp.setSelection([]); renderBrowser(); setPrompt('');
+    app.selectedBody = null; app.selectedFeature = null; vp.setSelection([]); renderBrowser(); setPrompt('');
     return;
   }
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
